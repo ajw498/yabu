@@ -161,6 +161,7 @@ The sixth line is a number 0 or 1 indicating whether to treat image
 files as directories
 The seventh line is a number 0 or 1 indicating whether to enable faster
 The eighth line is a number 0 or 1 indicating whether to enable verbose
+The ninth line is a number 0 or 1 indicating whether to enable MD5 checksums
 
 If any of the filenames are not needed, then just leave a blank line
 in their place.
