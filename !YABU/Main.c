@@ -18,38 +18,38 @@
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-	$Id: Main.c,v 1.10 2000-12-27 12:55:00 AJW Exp $
+	$Id: Main.c,v 1.11 2000-12-31 13:57:57 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
 #include "HierProf:HierProf.h"
 
-#include "OSLib:osgbpb.h"
-#include "OSLib:osfscontrol.h"
-#include "OSLib:fileraction.h"
+#include "oslib/osgbpb.h"
+#include "oslib/osfscontrol.h"
+#include "oslib/fileraction.h"
 
-#include "Desk.Window.h"
-#include "Desk.Error2.h"
-#include "Desk.Event.h"
-#include "Desk.EventMsg.h"
-#include "Desk.Handler.h"
-#include "Desk.Hourglass.h"
-#include "Desk.Icon.h"
-#include "Desk.Menu.h"
-#include "Desk.Msgs.h"
-#include "Desk.Filing.h"
-#include "Desk.DeskMem.h"
-#include "Desk.Resource.h"
-#include "Desk.Screen.h"
-#include "Desk.Template.h"
-#include "Desk.Str.h"
-#include "Desk.File.h"
-#include "Desk.Sprite.h"
+#include "Desk/Window.h"
+#include "Desk/Error2.h"
+#include "Desk/Event.h"
+#include "Desk/EventMsg.h"
+#include "Desk/Handler.h"
+#include "Desk/Hourglass.h"
+#include "Desk/Icon.h"
+#include "Desk/Menu.h"
+#include "Desk/Msgs.h"
+#include "Desk/Filing.h"
+#include "Desk/DeskMem.h"
+#include "Desk/Resource.h"
+#include "Desk/Screen.h"
+#include "Desk/Template.h"
+#include "Desk/Str.h"
+#include "Desk/File.h"
+#include "Desk/Sprite.h"
 
-#include "AJWLib.Window.h"
-#include "AJWLib.Menu.h"
-#include "AJWLib.Msgs.h"
-#include "AJWLib.Error2.h"
+#include "AJWLib/Window.h"
+#include "AJWLib/Menu.h"
+#include "AJWLib/Msgs.h"
+#include "AJWLib/Error2.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@
 #include <string.h>
 
 #define DIRPREFIX "YABU"
-#define VERSION "1.00 (27-Dec-2000)"
+#define VERSION "1.00 (31-Dec-2000)"
 #define AUTHOR "© Alex Waugh 2000"
 
 #define iconbarmenu_INFO 0

@@ -3,7 +3,7 @@ LIBS = \
 	C:Clib.o.stubs\
 	MemCheck:o.MC\
 	HierProf:o.hp\
-	OSLib:o.oslib\
+	C:oslib.o.oslib\
 	C:AJWLib.o.AJWLib\
 	C:Desk.o.Desk
 
@@ -31,15 +31,15 @@ LINK		=	DrLink $(LINKFLAGS)
 o.Main:	c.Main
 o.Main:	MemCheck:h.MemCheck
 o.Main:	HierProf:h.HierProf
-o.Main:	OSLib:h.osgbpb
-o.Main:	OSLib:h.types
-o.Main:	OSLib:h.os
-o.Main:	OSLib:h.fileswitch
-o.Main:	OSLib:h.osfscontrol
-o.Main:	OSLib:h.fileraction
-o.Main:	OSLib:h.wimp
-o.Main:	OSLib:h.osspriteop
-o.Main:	OSLib:h.font
+o.Main:	C:oslib.h.osgbpb
+o.Main:	C:oslib.h.types
+o.Main:	C:oslib.h.os
+o.Main:	C:oslib.h.fileswitch
+o.Main:	C:oslib.h.osfscontrol
+o.Main:	C:oslib.h.fileraction
+o.Main:	C:oslib.h.wimp
+o.Main:	C:oslib.h.osspriteop
+o.Main:	C:oslib.h.font
 o.Main:	C:Desk.h.Window
 o.Main:	C:Desk.h.Wimp
 o.Main:	C:Desk.h.Core
