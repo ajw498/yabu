@@ -2,19 +2,22 @@
 LIBS = \
 	L:Stubs.o.asstubs\
 	MemCheck:o.MC\
+	HierProf:o.hp\
 	OSLib:o.oslib\
 	L:AJWLib.o.AJWLib\
 	L:Desk.o.Desk
 
 #	L:AJWLib.o.AJWLib\
 
+#MEMCHECK	=	MemCheck.cc
+#HEIRPROF	=	-DHierProf_PROFILE
+
 INCLUDE	=	C:
 
-CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -g -I$(INCLUDE) -fah
-#CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -depend !Depend -I$(INCLUDE) -fah
+#CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -g -I$(INCLUDE) $(HEIRPROF) -fah
+CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -depend !Depend -I$(INCLUDE) $(HEIRPROF) -fah
 LINKFLAGS	=	$(LINKEXTRA) -d
 
-#MEMCHECK	=	MemCheck.cc
 CC		=	$(MEMCHECK) cc -c $(CCFLAGS)
 LINK		=	DrLink $(LINKFLAGS)
 
@@ -36,6 +39,7 @@ o.GUI:	C:tboxlibs.h.menu
 o.GUI:	C:tboxlibs.h.gadgets
 o.Main:	c.Main
 o.Main:	MemCheck:h.MemCheck
+o.Main:	HierProf:h.HierProf
 o.Main:	OSLib:h.osgbpb
 o.Main:	OSLib:h.types
 o.Main:	OSLib:h.os

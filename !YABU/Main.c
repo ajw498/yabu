@@ -2,10 +2,11 @@
 	Backup
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.7 2000-11-11 17:27:22 AJW Exp $
+	$Id: Main.c,v 1.8 2000-11-13 11:53:32 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
+#include "HierProf:HierProf.h"
 
 #include "OSLib:osgbpb.h"
 #include "OSLib:osfscontrol.h"
@@ -116,7 +117,7 @@ static int GenerateKey(char *filename, int size)
 	int len, i, key = 0;
 	
 	len = strlen(filename);
-	for (i=0; i<len; i++) key += filename[i];
+	for (i=0; i<len; i++) key += i*filename[i];
 	return key % size;
 }
 
@@ -634,6 +635,8 @@ int main(void)
 	MemCheck_InterceptSCLStringFunctions();
 	MemCheck_SetStoreMallocFunctions(1);
 	MemCheck_SetAutoOutputBlocksInfo(0);
+
+	HierProf_ProfileAllFunctions();
 
 	Desk_Error2_Init_JumpSig();
 	signal(SIGABRT,SIG_DFL);
