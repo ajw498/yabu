@@ -2,12 +2,13 @@
 	Backup
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.6 2000-11-11 15:53:51 AJW Exp $
+	$Id: Main.c,v 1.7 2000-11-11 17:27:22 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
 
 #include "OSLib:osgbpb.h"
+#include "OSLib:osfscontrol.h"
 #include "OSLib:fileraction.h"
 
 #include "Desk.Window.h"
@@ -19,6 +20,7 @@
 #include "Desk.Icon.h"
 #include "Desk.Menu.h"
 #include "Desk.Msgs.h"
+#include "Desk.Filing.h"
 #include "Desk.DeskMem.h"
 #include "Desk.Resource.h"
 #include "Desk.Screen.h"
@@ -66,7 +68,7 @@
 #define status_CANCEL 7
 
 #define MAXICONLENGTH 256
-
+#define MAXEXCLUDES 256
 #define BUFFER_SIZE 1024
 #define HASHTABLE_INCREMENT 10240
 
@@ -100,6 +102,8 @@ static Desk_icon_handle dragicon;
 static Desk_bool keeppolling=Desk_FALSE;
 static Desk_task_handle fileractiontaskhandle=0;
 static int numfilesread,numfilescopied;
+static int numexcludes=0;
+static char *excludes[MAXEXCLUDES];
 
 static Desk_window_handle proginfowin,mainwin,statuswin;
 static Desk_menu_ptr iconbarmenu;
@@ -123,6 +127,7 @@ static void InsertIntoHash(struct hashentry **hashptr, int size, struct hashentr
 	
 	key = GenerateKey(entry->filename,size);
 	while (hashptr[key]) {
+		if (strcmp(hashptr[key]->filename,entry->filename)==0) return; /*Newer entry for same file already exists in hash, so don't create a duplicate*/
 		key++;
 		if (key>=size) key = 0;
 	}
@@ -281,44 +286,57 @@ static void TraverseDir(char *dir)
 		}
 		if (numread!=0) {
 			char buffer[BUFFER_SIZE];
+			char canonical[BUFFER_SIZE];
+			Desk_bool exclude=Desk_FALSE;
+			int i;
 
+			if (dir) sprintf(buffer,"%s.%s.%s",srcdirbuffer,dir,namelist->info[0].name); else sprintf(buffer,"%s.%s",srcdirbuffer,namelist->info[0].name);
+			if (xosfscontrol_canonicalise_path(buffer,canonical,NULL,NULL,BUFFER_SIZE,&i)) strcpy(canonical,buffer);
+			for (i=0;i<numexcludes;i++) {
+				if (strcmp(canonical,excludes[i])==0) {
+					exclude=Desk_TRUE;
+					break;
+				}
+			}
 			if (dir) sprintf(buffer,"%s.%s",dir,namelist->info[0].name); else sprintf(buffer,"%s",namelist->info[0].name);
-			if (namelist->info[0].obj_type==fileswitch_IS_DIR || (traverseimages && namelist->info[0].obj_type==fileswitch_IS_IMAGE)) {
-				if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
-				fileractiontaskhandle=0;
-				Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
-				Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
-				TraverseDir(buffer);
-				if (!running) return;
-				Desk_Icon_SetText(statuswin,status_DIR,srcdirbuffer);
-			} else {
-				struct hashentry *entry;
-				int copy=1;
-
-				numfilesread++;
-				entry=FindEntry(buffer);
-				if (entry) {
-					if (namelist->info[0].load_addr==entry->load_addr && namelist->info[0].exec_addr==entry->exec_addr && namelist->info[0].size==entry->size) {
-						/*file hasn't changed, so don't copy it*/
-						copy=0;
+			if (!exclude) {
+				if (namelist->info[0].obj_type==fileswitch_IS_DIR || (traverseimages && namelist->info[0].obj_type==fileswitch_IS_IMAGE)) {
+					if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
+					fileractiontaskhandle=0;
+					Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
+					Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
+					TraverseDir(buffer);
+					if (!running) return;
+					Desk_Icon_SetText(statuswin,status_DIR,srcdirbuffer);
+				} else {
+					struct hashentry *entry;
+					int copy=1;
+	
+					numfilesread++;
+					entry=FindEntry(buffer);
+					if (entry) {
+						if (namelist->info[0].load_addr==entry->load_addr && namelist->info[0].exec_addr==entry->exec_addr && namelist->info[0].size==entry->size) {
+							/*file hasn't changed, so don't copy it*/
+							copy=0;
+						} else {
+							/*File exists, but has changed so copy it*/
+							copy=1;
+						}
 					} else {
-						/*File exists, but has changed so copy it*/
+						/*Doesn't exist in hash, so copy it*/
 						copy=1;
 					}
-				} else {
-					/*Doesn't exist in hash, so copy it*/
-					copy=1;
-				}
-				if (copy) {
-					if (listfile) fprintf(listfile,"%08X\t%08X\t%u\t%s\n",namelist->info[0].load_addr,namelist->info[0].exec_addr,namelist->info[0].size,buffer);
-					if (destdir) {
-						numfilescopied++;
-						/*Start Filer_Action task if it isn't already started*/
-						if (fileractiontaskhandle==0) {
-							Desk_Wimp_StartTask3("Filer_Action",&fileractiontaskhandle);
-							CheckOS(xfileraction_send_selected_directory((wimp_t)fileractiontaskhandle,srcdirbuffer));
+					if (copy) {
+						if (listfile) fprintf(listfile,"%08X\t%08X\t%u\t%s\n",namelist->info[0].load_addr,namelist->info[0].exec_addr,namelist->info[0].size,buffer);
+						if (destdir) {
+							numfilescopied++;
+							/*Start Filer_Action task if it isn't already started*/
+							if (fileractiontaskhandle==0) {
+								Desk_Wimp_StartTask3("Filer_Action",&fileractiontaskhandle);
+								CheckOS(xfileraction_send_selected_directory((wimp_t)fileractiontaskhandle,srcdirbuffer));
+							}
+							CheckOS(xfileraction_send_selected_file((wimp_t)fileractiontaskhandle,namelist->info[0].name));
 						}
-						CheckOS(xfileraction_send_selected_file((wimp_t)fileractiontaskhandle,namelist->info[0].name));
 					}
 				}
 			}
@@ -334,6 +352,8 @@ static void Backup(void)
 {
 	time_t currenttime;
 	char *icontext;
+	char *comma,*list;
+	int i;
 
 	Desk_Hourglass_On();
 	running=Desk_TRUE;
@@ -382,6 +402,24 @@ static void Backup(void)
 	} else {
 		listfile=NULL;
 	}
+
+	for (i=0;i<numexcludes;i++) free(excludes[i]);
+	numexcludes=0;
+	comma=list=Desk_Icon_GetTextPtr(mainwin,icon_EXCLUDE);
+	while (comma) {
+		char *dir;
+		char *buffer;
+
+		comma=strchr(list,',');
+		if (comma) *comma++='\0';
+		dir=list;
+		list=comma;
+		buffer=Desk_DeskMem_Malloc(BUFFER_SIZE);
+		if (xosfscontrol_canonicalise_path(dir,buffer,NULL,NULL,BUFFER_SIZE,&i)==NULL) {
+			if (numexcludes<MAXEXCLUDES) excludes[numexcludes++]=buffer;
+		}
+	}
+
 
 	Desk_Window_Hide(mainwin);
 	Desk_Window_Show(statuswin,Desk_open_CENTERED);
@@ -432,10 +470,10 @@ static Desk_bool ReceiveDrag(Desk_event_pollblock *block, void *ref)
 
 	Desk_UNUSED(ref);
 	switch (block->data.message.data.dataload.icon) {
-		case icon_SRC:
 		case icon_EXCLUDE:
 			replace=Desk_FALSE;
 			break;
+		case icon_SRC:
 		case icon_DEST:
 		case icon_EXIST:
 		case icon_NEW:
@@ -448,7 +486,7 @@ static Desk_bool ReceiveDrag(Desk_event_pollblock *block, void *ref)
 	text=Desk_Icon_GetTextPtr(mainwin,block->data.message.data.dataload.icon);
 	if (!replace) len=strlen(text);
 	if (len+2+strlen(block->data.message.data.dataload.filename)>MAXICONLENGTH) {
-		Desk_Error_Report(1,"Not enough room in icon"); /*msgs*/
+		Desk_Msgs_Report(1,"Error.NoRoom:Not enough room in icon");
 		return Desk_TRUE;
 	}
 	if (replace) {
@@ -469,6 +507,11 @@ static Desk_bool IconBarClick(Desk_event_pollblock *block, void *ref)
 		if (running) {
 			Desk_Window_BringToFront(statuswin);
 		} else {
+			Desk_Icon_SetText(mainwin,icon_SRC,"");
+			Desk_Icon_SetText(mainwin,icon_DEST,"");
+			Desk_Icon_SetText(mainwin,icon_EXCLUDE,"");
+			Desk_Icon_SetText(mainwin,icon_EXIST,"");
+			Desk_Icon_SetText(mainwin,icon_NEW,"");
 			Desk_Window_Show(mainwin,Desk_open_CENTERED);
 			Desk_Icon_SetCaret(mainwin,icon_SRC);
 		}
