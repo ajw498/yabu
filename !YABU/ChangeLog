@@ -1,0 +1,7 @@
+v1.01 12-Feb-01
+Added saving of default setup.
+Added ability to specify more than one directory in the source field.
+Fixed a memory leak.
+
+v1.00 31-Dec-00
+Initial version

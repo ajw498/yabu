@@ -18,7 +18,7 @@
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-	$Id: Main.c,v 1.11 2000-12-31 13:57:57 AJW Exp $
+	$Id: Main.c,v 1.12 2001-02-12 21:49:57 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
@@ -26,6 +26,7 @@
 
 #include "oslib/osgbpb.h"
 #include "oslib/osfscontrol.h"
+#include "oslib/osfile.h"
 #include "oslib/fileraction.h"
 
 #include "Desk/Window.h"
@@ -48,6 +49,7 @@
 
 #include "AJWLib/Window.h"
 #include "AJWLib/Menu.h"
+#include "AJWLib/File.h"
 #include "AJWLib/Msgs.h"
 #include "AJWLib/Error2.h"
 
@@ -58,7 +60,7 @@
 #include <string.h>
 
 #define DIRPREFIX "YABU"
-#define VERSION "1.00 (31-Dec-2000)"
+#define VERSION "1.01 (12-Feb-2001)"
 #define AUTHOR "© Alex Waugh 2000"
 
 #define iconbarmenu_INFO 0
@@ -78,6 +80,7 @@
 #define icon_EXIST 9
 #define icon_NEW 10
 #define icon_NEWDRAG 14
+#define icon_SAVEDEFAULT 18
 
 #define status_DIR 0
 #define status_READ 2
@@ -87,6 +90,7 @@
 
 #define MAXICONLENGTH 256
 #define MAXEXCLUDES 256
+#define MAXSRCS 256
 #define BUFFER_SIZE 1024
 #define HASHTABLE_INCREMENT 10240
 
@@ -100,6 +104,15 @@
 	Desk_Event_mask.data.null=1;\
 }
 
+static struct {
+	char *src;
+	char *dest;
+	char *exclude;
+	char *existinglist;
+	char *newlist;
+	Desk_bool images;
+	Desk_bool faster;
+} defaults;
 
 static FILE *listfile=NULL,*oldlistfile=NULL;
 
@@ -122,11 +135,12 @@ static Desk_task_handle fileractiontaskhandle=0;
 static int numfilesread,numfilescopied;
 static int numexcludes=0;
 static char *excludes[MAXEXCLUDES];
+static int numsrcs=0;
+static char *srcdirs[MAXSRCS];
 
 static Desk_window_handle proginfowin,mainwin,statuswin;
 static Desk_menu_ptr iconbarmenu;
 static char *taskname=NULL,*errbad=NULL;
-
 
 static int GenerateKey(char *filename, int size)
 /*generate a hash table key for given filename*/
@@ -387,7 +401,22 @@ static void Backup(void)
 
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_SRC);
 	if (icontext[0]) {
-		srcdir=icontext;
+		for (i=0;i<numsrcs;i++) free(srcdirs[i]);
+		numsrcs=0;
+		comma=list=icontext;
+		while (comma) {
+			char *dir;
+			char *buffer;
+	
+			comma=strchr(list,',');
+			if (comma) *comma++='\0';
+			dir=list;
+			list=comma;
+			buffer=Desk_DeskMem_Malloc(BUFFER_SIZE);
+			if (xosfscontrol_canonicalise_path(dir,buffer,NULL,NULL,BUFFER_SIZE,&i)==NULL) {
+				if (numsrcs<MAXSRCS) srcdirs[numsrcs++]=buffer;
+			}
+		}
 	} else {
 		Desk_Msgs_Report(1,"Error.NoSrc:Source directory cannot be left blank");
 		running=Desk_FALSE;
@@ -449,12 +478,14 @@ static void Backup(void)
 	Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
 	Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
 
-	/*Print date and directory to the file (for human reference only)*/
-	time(&currenttime);
-	if (listfile) fprintf(listfile,"#%s#%s\n",ctime(&currenttime),srcdir);
-
 	/*Do the business*/
-	TraverseDir(NULL);
+	for (i=0;i<numsrcs;i++) {
+		srcdir=srcdirs[i];
+		/*Print date and directory to the file (for human reference only)*/
+		time(&currenttime);
+		if (listfile) fprintf(listfile,"#%s#%s\n",ctime(&currenttime),srcdir);
+		TraverseDir(NULL);
+	}
 
 	/*Concatenate old list file on end of new list file*/
 	if (listfile && oldlistfile) {
@@ -474,6 +505,8 @@ static void Backup(void)
 	}
 
 	/*Tidy up*/
+	if (hashtable) free(hashtable);
+	hashtable = NULL;
 	if (listfile) fclose(listfile);
 	if (oldlistfile) fclose(oldlistfile);
 	AJWLib_Msgs_SetText(statuswin,status_DIR,"Status.3:");
@@ -489,10 +522,10 @@ static Desk_bool ReceiveDrag(Desk_event_pollblock *block, void *ref)
 
 	Desk_UNUSED(ref);
 	switch (block->data.message.data.dataload.icon) {
+		case icon_SRC:
 		case icon_EXCLUDE:
 			replace=Desk_FALSE;
 			break;
-		case icon_SRC:
 		case icon_DEST:
 		case icon_EXIST:
 		case icon_NEW:
@@ -526,11 +559,13 @@ static Desk_bool IconBarClick(Desk_event_pollblock *block, void *ref)
 		if (running) {
 			Desk_Window_BringToFront(statuswin);
 		} else {
-			Desk_Icon_SetText(mainwin,icon_SRC,"");
-			Desk_Icon_SetText(mainwin,icon_DEST,"");
-			Desk_Icon_SetText(mainwin,icon_EXCLUDE,"");
-			Desk_Icon_SetText(mainwin,icon_EXIST,"");
-			Desk_Icon_SetText(mainwin,icon_NEW,"");
+			Desk_Icon_SetText(mainwin,icon_SRC,defaults.src);
+			Desk_Icon_SetText(mainwin,icon_DEST,defaults.dest);
+			Desk_Icon_SetText(mainwin,icon_EXCLUDE,defaults.exclude);
+			Desk_Icon_SetText(mainwin,icon_EXIST,defaults.existinglist);
+			Desk_Icon_SetText(mainwin,icon_NEW,defaults.newlist);
+			Desk_Icon_SetSelect(mainwin,icon_IMAGES,defaults.images);
+			Desk_Icon_SetSelect(mainwin,icon_FASTER,defaults.faster);
 			Desk_Window_Show(mainwin,Desk_open_CENTERED);
 			Desk_Icon_SetCaret(mainwin,icon_SRC);
 		}
@@ -653,10 +688,83 @@ static void IconBarMenuClick(int entry, void *ref)
 	}
 }
 
+#define FindEndOfLine(x) {\
+	while (*x!='\0' && *x!='\n') x++;\
+	if (*x=='\0') return;\
+	*(x++)='\0';\
+}
+
+static void LoadDefaults(void)
+{
+	char *file, *filename;
+
+	defaults.src="";
+	defaults.dest="";
+	defaults.exclude="";
+	defaults.existinglist="";
+	defaults.newlist="";
+	defaults.images=Desk_FALSE;
+	defaults.faster=Desk_FALSE;
+	if (getenv("Choices$Path")) {
+		filename="Choices:YABU.Defaults";
+	} else {
+		filename="<YABU$Dir>.Defaults";
+	}
+	if (Desk_File_Exists(filename)) {
+		if ((file=Desk_File_AllocLoad0(filename))!=NULL) {
+			defaults.src=file;
+			FindEndOfLine(file);
+			defaults.dest=file;
+			FindEndOfLine(file);
+			defaults.exclude=file;
+			FindEndOfLine(file);
+			defaults.existinglist=file;
+			FindEndOfLine(file);
+			defaults.newlist=file;
+			FindEndOfLine(file);
+			defaults.images=(Desk_bool)strtol(file,&file,10);
+			defaults.faster=(Desk_bool)strtol(file,&file,10);
+		}
+	}
+}
+
+static Desk_bool SaveDefaults(Desk_event_pollblock *block, void *ref)
+{
+	FILE *file;
+	char *filename;
+
+	Desk_UNUSED(ref);
+	if (block->data.mouse.button.data.menu) return Desk_FALSE;
+	/* This is a small memory leak... */
+	defaults.src=Desk_strdup(Desk_Icon_GetTextPtr(mainwin,icon_SRC));
+	defaults.dest=Desk_strdup(Desk_Icon_GetTextPtr(mainwin,icon_DEST));
+	defaults.exclude=Desk_strdup(Desk_Icon_GetTextPtr(mainwin,icon_EXCLUDE));
+	defaults.existinglist=Desk_strdup(Desk_Icon_GetTextPtr(mainwin,icon_EXIST));
+	defaults.newlist=Desk_strdup(Desk_Icon_GetTextPtr(mainwin,icon_NEW));
+	defaults.images=Desk_Icon_GetSelect(mainwin,icon_IMAGES);
+	defaults.faster=Desk_Icon_GetSelect(mainwin,icon_FASTER);
+	if (getenv("Choices$Write")) {
+		osfile_create_dir("<Choices$Write>.YABU",1);
+		filename="<Choices$Write>.YABU.Defaults";
+	} else {
+		filename="<YABU$Dir>.Defaults";
+	}
+	file=AJWLib_File_fopen(filename,"w");
+	fprintf(file,"%s\n",defaults.src);
+	fprintf(file,"%s\n",defaults.dest);
+	fprintf(file,"%s\n",defaults.exclude);
+	fprintf(file,"%s\n",defaults.existinglist);
+	fprintf(file,"%s\n",defaults.newlist);
+	fprintf(file,"%d\n",defaults.images);
+	fprintf(file,"%d\n",defaults.faster);
+	fclose(file);
+
+	return Desk_TRUE;
+}
+
 int main(void)
 {
 	MemCheck_Init();
-/*	MemCheck_RegisterArgs(argc,argv);*/
 	MemCheck_InterceptSCLStringFunctions();
 	MemCheck_SetStoreMallocFunctions(1);
 	MemCheck_SetAutoOutputBlocksInfo(0);
@@ -700,9 +808,11 @@ int main(void)
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_NEWDRAG,IconDrag,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_OK,OKClick,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_CANCEL,CancelClick,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_SAVEDEFAULT,SaveDefaults,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,statuswin,status_CANCEL,StatusCancelClick,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,statuswin,status_SKIP,SkipClick,NULL);
 		Desk_Event_Claim(Desk_event_USERDRAG,Desk_event_ANY,Desk_event_ANY,DragHandler,NULL);
+		LoadDefaults();
 	} Desk_Error2_Catch {
 		Desk_Hourglass_Off();
 		AJWLib_Error2_Report("Fatal error while initialising (%s)");

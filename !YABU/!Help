@@ -2,7 +2,7 @@
                     ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 What does it do?
-
+~~~~~~~~~~~~~~~~
 It helps to create backups, in particular backups of only the files that
 have changed since the last time you backed up.
 
@@ -15,7 +15,7 @@ It is supplied under the GNU general public licence, see the file
 Licence for more details.
 
 Why did I write this program?
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 I had a CD writer, and I used it to backup my data, but it took quite a
 long time to back everything up, and most of it never changed anyway. So
 I didn't back up as often as I should have done.
@@ -23,7 +23,7 @@ When I accidentally wiped my hard disc, I got rather annoyed. Therefore
 I decided to write this program so I would backup more frequently.
 
 How does it work?
-
+~~~~~~~~~~~~~~~~~
 It copies files from the source directory to the destination
 directory, and creates a list of all the files it has copied, including their size
 and date stamps.
@@ -32,13 +32,13 @@ that was generated the first time. It will then only copy files that
 aren't on the list, or that have been updated since the list was made.
 
 Isn't this what the Newer option on the filer does?
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Yes. However the newer option won't work if the destination is read only
 such as a CDR, or if the backups are split over several discs.
 
 
 How do I use it?
-
+~~~~~~~~~~~~~~~~
 Double click on the !YABU icon in the filer window. An icon should
 appear on the iconbar. Click select on this icon, and a window will
 open.
@@ -96,6 +96,9 @@ the desktop; it makes the copying faster, but leaves the desktop
 slightly less responsive whilst copying. This option will probably only
 have any effect on RISC OS 4.
 
+Save as default:
+If you click on this button then the contents of the window will be
+saved and used as the default settings for the future.
 
 Making a list of already backed up files:
 If you have already backed up some files, and want to make a list of
@@ -111,8 +114,9 @@ not be a problem.
 
 
 What happens when everything goes pear shaped and I need to restore
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 my backed up files?
-
+~~~~~~~~~~~~~~~~~~~
 This has to be done manually. Copy all files from the first backup to
 wherever you want. Then copy the subsequent backups on top of the first,
 in the same order as the backups were made.
@@ -120,11 +124,19 @@ in the same order as the backups were made.
 
 
 Problems
-
-There are no known bugs at present.
-If you rename a directory, then all the file within it are deemed to
+~~~~~~~~
+If you rename a directory, then all the files within it are deemed to
 have changed.
+
 The exclude field only has room for about four or five entries.
+
+If you specify more than one directory in the source field, and within
+those source directories there are two files with the same pathname
+relative to the directories specified in the source field then only one
+of those files will end up in the destination directory (you are
+effectivly merging two directories and so any file from one directory
+with the same pathname as one from the second directory will get
+overwritten by the one from the second directory).
  
 Suggestions for improvements are welcome.
 If you find a bug, please let me know, or better still fix it yourself
