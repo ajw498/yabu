@@ -1,7 +1,6 @@
-Set Backup$Dir <Obey$Dir>
+Set YABU$Dir <Obey$Dir>
 
-IconSprites <Backup$Dir>.!Sprites
+IconSprites <YABU$Dir>.!Sprites
 
-|WimpSlot -Min 240k -Max 240k
-Run <Backup$Dir>.!RunImage CDROMFS::0.$ none none ADFS::4.$.list 2>stderr
-Taskwindow "type stderr" -name stderr -wimpslot 300k -quit
+WimpSlot -Min 68k -Max 68k
+Run <YABU$Dir>.!RunImage

@@ -1,8 +1,24 @@
 /*
-	Backup
+	YABU   Yet Another Backup Utility
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.9 2000-11-25 00:55:52 AJW Exp $
+
+	This program is free software; you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation; either version 2 of the License, or
+	(at your option) any later version.
+	
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+	
+	You should have received a copy of the GNU General Public License
+	along with this program; if not, write to the Free Software
+	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+	$Id: Main.c,v 1.10 2000-12-27 12:55:00 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
@@ -41,12 +57,13 @@
 #include <time.h>
 #include <string.h>
 
-#define DIRPREFIX "Backup"
-#define VERSION "1.00"
+#define DIRPREFIX "YABU"
+#define VERSION "1.00 (27-Dec-2000)"
 #define AUTHOR "© Alex Waugh 2000"
 
 #define iconbarmenu_INFO 0
-#define iconbarmenu_QUIT 1
+#define iconbarmenu_HELP 1
+#define iconbarmenu_QUIT 2
 
 #define icon_OK 16
 #define icon_CANCEL 15
@@ -626,7 +643,14 @@ static Desk_bool DragHandler(Desk_event_pollblock *block, void *ref)
 static void IconBarMenuClick(int entry, void *ref)
 {
 	Desk_UNUSED(ref);
-	if (entry==iconbarmenu_QUIT) Desk_Event_CloseDown();
+	switch (entry) {
+		case iconbarmenu_HELP:
+			system("Filer_Run <" DIRPREFIX "$Dir>.!Help");
+			break;
+		case iconbarmenu_QUIT:
+			Desk_Event_CloseDown();
+			break;
+	}
 }
 
 int main(void)
@@ -684,9 +708,6 @@ int main(void)
 		AJWLib_Error2_Report("Fatal error while initialising (%s)");
 		return EXIT_FAILURE;
 	} Desk_Error2_EndCatch
-
-
-	/*Sort out command line arguments?*/
 
 	Desk_Hourglass_Off();
 	while (Desk_TRUE) {

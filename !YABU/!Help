@@ -1,0 +1,137 @@
+                    Yet Another Backup Utility
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+What does it do?
+
+It helps to create backups, in particular backups of only the files that
+have changed since the last time you backed up.
+
+It was designed for backing up files to large discs such as CDR, hard
+discs, zip discs, etc. It won't be much use for floppy discs.
+
+This program comes with no warranty; you use it at your own risk. Having
+said that, I trust it enough to use it for my backups.
+It is supplied under the GNU general public licence, see the file
+Licence for more details.
+
+Why did I write this program?
+
+I had a CD writer, and I used it to backup my data, but it took quite a
+long time to back everything up, and most of it never changed anyway. So
+I didn't back up as often as I should have done.
+When I accidentally wiped my hard disc, I got rather annoyed. Therefore
+I decided to write this program so I would backup more frequently.
+
+How does it work?
+
+It copies files from the source directory to the destination
+directory, and creates a list of all the files it has copied, including their size
+and date stamps.
+The next time you want to backup, do the same, but let it have the list
+that was generated the first time. It will then only copy files that
+aren't on the list, or that have been updated since the list was made.
+
+Isn't this what the Newer option on the filer does?
+
+Yes. However the newer option won't work if the destination is read only
+such as a CDR, or if the backups are split over several discs.
+
+
+How do I use it?
+
+Double click on the !YABU icon in the filer window. An icon should
+appear on the iconbar. Click select on this icon, and a window will
+open.
+
+To backup for the first time:
+
+Drag the directory containing the files you want to backup to the source
+directory field.
+Drag the directory that will contain the backed up files to the destination
+directory field.
+Drag any directories and files that are in the source directory, but you
+don't want backed up, to the exclude field.
+
+Drag the icon next to the new files list to a directory somewhere where
+you want to save the list of files. Inside the destination directory is
+a good place.
+
+Click on the Backup icon.
+
+A status window will then open, showing the directory currently being
+copied, and the number of files copied so far.
+
+When it has finished, click on the close icon.
+
+The destination directory can then be written to CD or whatever, then
+deleted.
+
+To backup subsequently:
+
+Set up as for the first time, but drag the files list that was created
+from the previous backup to the existing files list field.
+
+Click on the Backup icon.
+
+The status window will open, but this time only files that have changed
+or are new since the last backup will be copied.
+
+
+The files checked field in the status display shows how many files in
+the source directory have been check to see if they need copying.
+The files copied field in the status display show how many of the files
+check have actually been copied.
+
+Files are copied using the Filer Action module (which is the same as is
+used when you copy files in the desktop).
+
+There are two options:
+Treat image files as directories
+If ticked then image files (such as PC partitions, archives if ArcFS or
+SparkFS are loaded, etc.) will be treated as directories rather than
+files. I recommend you leave this unticked.
+Faster
+This has the same effect as faster does when normally copying files in
+the desktop; it makes the copying faster, but leaves the desktop
+slightly less responsive whilst copying. This option will probably only
+have any effect on RISC OS 4.
+
+
+Making a list of already backed up files:
+If you have already backed up some files, and want to make a list of
+those files so that you don't have to back them up again if they haven't
+changed, then drag the directory containing the files to the source
+directory field, leave the destination directory field blank, and fill in
+the new files list field. Then click on the Backup icon.
+This will only work if the filenames are unchanged on the backup medium.
+For example if you backup to CDR, and all the filenames get translated
+to upper case then it will not work as the files will be considered
+different. If you write Joliet format CDs and use CDROMFS then this will
+not be a problem.
+
+
+What happens when everything goes pear shaped and I need to restore
+my backed up files?
+
+This has to be done manually. Copy all files from the first backup to
+wherever you want. Then copy the subsequent backups on top of the first,
+in the same order as the backups were made.
+
+
+
+Problems
+
+There are no known bugs at present.
+If you rename a directory, then all the file within it are deemed to
+have changed.
+
+Suggestions for improvements are welcome.
+If you find a bug, please let me know, or better still fix it yourself
+and send me a patch.
+
+Any updates will be available from
+http://www.ecs.soton.ac.uk/~ajw498/utilities/
+
+Alex Waugh
+ajw498@ecs.soton.ac.uk
+

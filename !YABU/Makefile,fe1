@@ -1,13 +1,11 @@
 
 LIBS = \
-	L:Stubs.o.asstubs\
+	C:Clib.o.stubs\
 	MemCheck:o.MC\
 	HierProf:o.hp\
 	OSLib:o.oslib\
-	L:AJWLib.o.AJWLib\
-	L:Desk.o.Desk
-
-#	L:AJWLib.o.AJWLib\
+	C:AJWLib.o.AJWLib\
+	C:Desk.o.Desk
 
 #MEMCHECK	=	MemCheck.cc
 #HEIRPROF	=	-DHierProf_PROFILE
@@ -29,14 +27,7 @@ LINK		=	DrLink $(LINKFLAGS)
 	$(CC) $< -o $@
 
 
-# Dynamic dependencies:o.GUI:	c.GUI
-o.GUI:	C:tboxlibs.h.wimp
-o.GUI:	C:tboxlibs.h.toolbox
-o.GUI:	C:h.kernel
-o.GUI:	C:tboxlibs.h.event
-o.GUI:	C:tboxlibs.h.wimplib
-o.GUI:	C:tboxlibs.h.menu
-o.GUI:	C:tboxlibs.h.gadgets
+# Dynamic dependencies:
 o.Main:	c.Main
 o.Main:	MemCheck:h.MemCheck
 o.Main:	HierProf:h.HierProf

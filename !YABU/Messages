@@ -1,9 +1,9 @@
-Task.Name:Backup
-Task.Icon:!backup
+Task.Name:YABU
+Task.Icon:!yabu
 Task.Purpose:Backup files
 
 Title.IconBar:<Task.Name>
-Menu.IconBar:Info,Quit
+Menu.IconBar:Info,Help,Quit
 
 Status.1:Reading existing files list
 Status.2:Writing files list
