@@ -18,7 +18,7 @@
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-	$Id: Main.c,v 1.15 2001-09-19 22:23:58 AJW Exp $
+	$Id: Main.c,v 1.16 2002-10-06 16:23:16 ajw Exp $
 */
 
 #ifdef MemCheck_MEMCHECK
@@ -64,7 +64,7 @@
 #include <string.h>
 
 #define DIRPREFIX "YABU"
-#define VERSION "1.03 (19-Sep-2001)"
+#define VERSION "1.04 (6-Oct-2002)"
 #define AUTHOR "© Alex Waugh 2000"
 
 #define iconbarmenu_INFO 0
@@ -97,7 +97,8 @@
 #define MAXICONLENGTH 256
 #define MAXEXCLUDES 256
 #define MAXSRCS 256
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 10240
+#define MAX_BUFFER_ENTRIES 1000
 #define HASHTABLE_INCREMENT 10240
 #define MD5LEN 32
 
@@ -290,12 +291,12 @@ static Desk_bool TaskCloseDownMsg(Desk_event_pollblock *block,void *ref)
 static void StartFilerAction(char *dest)
 {
 	CheckOS(xfileractionsendstartoperation_copy((wimp_t)fileractiontaskhandle,(verbose | fileraction_FORCE | faster),dest,strlen(dest)+1));
-
 	/*Poll the wimp, and let Filer_Action do it's thing*/
 	keeppolling=Desk_TRUE;
 	while (keeppolling) {
 		Desk_Hourglass_Off();
 		Desk_Event_Poll();
+		lastpoll=os_read_monotonic_time();
 		Desk_Hourglass_On();
 		if (!running) return;
 	}
@@ -335,7 +336,7 @@ static void TraverseDir(char *dir)
 		os_error *err;
 
 		namelist=(osgbpb_info_list *)namebuffer;
-		err=xosgbpb_dir_entries_info(srcdirbuffer,namelist,100,context,BUFFER_SIZE,NULL,&numread,&context);
+		err=xosgbpb_dir_entries_info(srcdirbuffer,namelist,MAX_BUFFER_ENTRIES,context,BUFFER_SIZE,NULL,&numread,&context);
 		if (err) {
 			Desk_Icon_SetText(statuswin,status_READ,err->errmess);
 			Desk_Wimp_SetIconState(statuswin,status_SKIP,0,1<<23); /*Undelete icon*/
@@ -353,10 +354,6 @@ static void TraverseDir(char *dir)
 			char canonical[BUFFER_SIZE];
 			Desk_bool exclude=Desk_FALSE;
 			int i;
-
-			/*Do a bit of multitasking*/
-			if (CHECKPOLL) MultiTask();
-			if (!running) return;
 
 			sprintf(buffer,"%s.%s",srcdirbuffer,namelist->info[0].name);
 			if (xosfscontrol_canonicalise_path(buffer,canonical,NULL,NULL,BUFFER_SIZE,&i)) strcpy(canonical,buffer);
@@ -430,6 +427,14 @@ static void TraverseDir(char *dir)
 			}
 			namelist=(osgbpb_info_list *)((((int)namelist)+20+strlen(namelist->info[0].name)+4)&~3);
 			numread--;
+		}
+		/*Do a bit of multitasking*/
+		if (CHECKPOLL) {
+			if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
+			fileractiontaskhandle=0;
+			Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
+			Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
+			if (!running) return;
 		}
 	} while (context!=osgbpb_NO_MORE);
 	if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
