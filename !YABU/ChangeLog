@@ -1,3 +1,6 @@
+v1.05 5-Dec-02
+Recompiled for 32bit compatibility
+
 v1.04 6-Oct-02
 Fixed bug that could cause it to get stuck in the middle of very large directories
 

@@ -1,0 +1,3 @@
+Dir <Obey$Dir>
+remove yabu/zip
+zip -r -9 yabu/zip !YABU Licence -x *CVS* *.o.*

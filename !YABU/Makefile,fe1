@@ -9,24 +9,28 @@
 
 
 LIBS = \
-	C:o.stubs\
 	$(MEMCHECKLIB)\
 	$(HIERPROFLIB)\
 	OSLib:o.oslib\
-	C:AJWLib.o.AJWLib\
-	C:Desk.o.Desk
+	AJWLib:o.AJWLib\
+	Desk:o.Desk
+
+#	C:o.stubs\
 
 
-INCLUDE = C:,OSLib:
+INCLUDE = -IAJWLib: -IDesk: -IOSLib:
 
 #DEBUG = -g
 
-CCFLAGS = -throwback -strict -depend !Depend -Wg $(DEBUG) -Otime -I$(INCLUDE) $(HEIRPROF) -fah
+#CCFLAGS = -throwback -strict -depend !Depend -Wg $(DEBUG) -Otime $(INCLUDE) $(HEIRPROF) -fah
+CCFLAGS = -O2 -mthrowback -Wall -mlibscl $(INCLUDE)
 #LINKFLAGS = -d
+LINKFLAGS = -mlibscl
 
-CC = $(MEMCHECK) cc
-LINK = Link
-
+#CC = $(MEMCHECK) cc
+#LINK = Link
+CC = gcc
+LINK = gcc
 
 !RunImage: Main.o
 	$(LINK) $(LINKFLAGS) -o $@ Main.o $(LIBS)

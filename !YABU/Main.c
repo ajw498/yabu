@@ -18,7 +18,7 @@
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-	$Id: Main.c,v 1.16 2002-10-06 16:23:16 ajw Exp $
+	$Id: Main.c,v 1.17 2002-12-05 23:10:22 ajw Exp $
 */
 
 #ifdef MemCheck_MEMCHECK
@@ -64,7 +64,7 @@
 #include <string.h>
 
 #define DIRPREFIX "YABU"
-#define VERSION "1.04 (6-Oct-2002)"
+#define VERSION "1.05 (5-Dec-2002)"
 #define AUTHOR "© Alex Waugh 2000"
 
 #define iconbarmenu_INFO 0
