@@ -2,5 +2,13 @@ Set YABU$Dir <Obey$Dir>
 
 IconSprites <YABU$Dir>.!Sprites
 
+RMEnsure UtilityModule 3.10 Error This application requires RISC OS 3.10 or later
+RMEnsure UtilityModule 3.70 RMEnsure CallASWI 0.02 RMLoad System:Modules.CallASWI
+RMEnsure UtilityModule 3.70 RMEnsure CallASWI 0.02 Error This application requires CallASWI 0.02 or later
+RMEnsure FPEmulator 4.03 RMLoad System:Modules.FPEmulator
+RMEnsure FPEmulator 4.03 Error This application requires FPEmulator 4.03 or later
+RMEnsure SharedCLibrary 5.17 RMLoad System:Modules.CLib
+RMEnsure SharedCLibrary 5.34 Error This application requires SharedCLibrary 5.34 or later
+
 WimpSlot -Min 68k -Max 68k
 Run <YABU$Dir>.!RunImage %*0
