@@ -2,7 +2,7 @@
 	Backup
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.5 2000-11-11 14:08:54 AJW Exp $
+	$Id: Main.c,v 1.6 2000-11-11 15:53:51 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
@@ -95,6 +95,7 @@ static int hashtableentries=0,hashtablesize=0;
 static char *srcdir=NULL,*destdir=NULL;
 static Desk_bool traverseimages,running=Desk_FALSE;
 static int faster=0;
+static Desk_icon_handle dragicon;
 
 static Desk_bool keeppolling=Desk_FALSE;
 static Desk_task_handle fileractiontaskhandle=0;
@@ -309,9 +310,9 @@ static void TraverseDir(char *dir)
 					copy=1;
 				}
 				if (copy) {
-					numfilescopied++;
 					if (listfile) fprintf(listfile,"%08X\t%08X\t%u\t%s\n",namelist->info[0].load_addr,namelist->info[0].exec_addr,namelist->info[0].size,buffer);
 					if (destdir) {
+						numfilescopied++;
 						/*Start Filer_Action task if it isn't already started*/
 						if (fileractiontaskhandle==0) {
 							Desk_Wimp_StartTask3("Filer_Action",&fileractiontaskhandle);
@@ -357,9 +358,11 @@ static void Backup(void)
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_EXIST);
 	if (icontext[0]) {
 		oldlistfile=fopen(icontext,"r");
-		if (oldlistfile==NULL) Desk_Msgs_Report(1,"Error.Open1:Can't open file");
-		running=Desk_FALSE;
-		return;
+		if (oldlistfile==NULL) {
+			Desk_Msgs_Report(1,"Error.Open1:Can't open file");
+			running=Desk_FALSE;
+			return;
+		}
 	} else {
 		oldlistfile=NULL;
 	}
@@ -370,10 +373,12 @@ static void Backup(void)
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_NEW);
 	if (icontext[0]) {
 		listfile=fopen(icontext,"w");
-		if (listfile==NULL) Desk_Msgs_Report(1,"Error.Open2:Unable to open new list file");
-		if (oldlistfile) fclose(oldlistfile);
-		running=Desk_FALSE;
-		return;
+		if (listfile==NULL) {
+			Desk_Msgs_Report(1,"Error.Open2:Unable to open new list file");
+			if (oldlistfile) fclose(oldlistfile);
+			running=Desk_FALSE;
+			return;
+		}
 	} else {
 		listfile=NULL;
 	}
@@ -509,6 +514,70 @@ static Desk_bool OKClick(Desk_event_pollblock *block, void *ref)
 	return Desk_TRUE;
 }
 
+static Desk_bool IconDrag(Desk_event_pollblock *block, void *ref)
+{
+	Desk_UNUSED(ref);
+	if (!block->data.mouse.button.data.select) return Desk_FALSE;
+	switch (block->data.mouse.icon) {
+		case icon_SRCDRAG:
+			dragicon=icon_SRC;
+			break;
+		case icon_DESTDRAG:
+			dragicon=icon_DEST;
+			break;
+		case icon_EXCLUDEDRAG:
+			dragicon=icon_EXCLUDE;
+			break;
+		case icon_NEWDRAG:
+			dragicon=icon_NEW;
+			break;
+		default:
+			return Desk_FALSE;
+	}
+	Desk_Icon_StartSolidDrag(mainwin,block->data.mouse.icon);
+	return Desk_TRUE;
+}
+
+static Desk_bool DataSaveAckHandler(Desk_event_pollblock *block, void *ref)
+{
+	char *filename,*leafname;
+	int len;
+
+	Desk_UNUSED(ref);
+	filename=block->data.message.data.datasaveack.filename;
+	len=strlen(filename);
+	if (len>5 && dragicon!=icon_NEW) {
+		leafname=filename+len-5;
+		if (Desk_stricmp(leafname,".List")==0) filename[len-5]='\0';
+	}
+	Desk_Icon_SetText(mainwin,dragicon,filename);
+	Desk_Icon_SetCaret(mainwin,dragicon);
+	return Desk_TRUE;
+}
+
+static Desk_bool DragHandler(Desk_event_pollblock *block, void *ref)
+{
+	Desk_mouse_block ptrblk;
+	Desk_message_block msgblk;
+	char *leafname;
+
+	Desk_UNUSED(block);
+	Desk_UNUSED(ref);
+	Desk_Wimp_GetPointerInfo(&ptrblk);
+	if (dragicon==icon_NEW) leafname=Desk_Str_LeafName(Desk_Icon_GetTextPtr(mainwin,dragicon)); else leafname="List";
+	if (leafname[0]) strcpy(msgblk.data.datasave.leafname,leafname); else strcpy(msgblk.data.datasave.leafname,"List");
+	msgblk.header.size=(sizeof(Desk_message_header)+28+strlen(msgblk.data.datasave.leafname)) & ~3;
+	msgblk.header.yourref=0;
+	msgblk.header.action=Desk_message_DATASAVE;
+	msgblk.data.datasave.window=ptrblk.window;
+	msgblk.data.datasave.icon=ptrblk.icon;
+	msgblk.data.datasave.pos=ptrblk.pos;
+	msgblk.data.datasave.estsize=1;
+	msgblk.data.datasave.filetype=0x1000;
+	Desk_Wimp_SendMessage(Desk_event_USERMESSAGE,&msgblk,ptrblk.window,ptrblk.icon);
+	return Desk_TRUE;
+}
+
 static void IconBarMenuClick(int entry, void *ref)
 {
 	Desk_UNUSED(ref);
@@ -552,12 +621,17 @@ int main(void)
 		AJWLib_Menu_Attach(Desk_window_ICONBAR,Desk_event_ANY,iconbarmenu,Desk_button_MENU);
 		Desk_Event_Claim(Desk_event_CLICK,Desk_window_ICONBAR,Desk_event_ANY,IconBarClick,NULL);
 		Desk_EventMsg_Claim(Desk_message_DATALOAD,mainwin,ReceiveDrag,NULL);
+		Desk_EventMsg_Claim(Desk_message_DATASAVEACK,Desk_event_ANY,DataSaveAckHandler,NULL);
 		Desk_EventMsg_Claim(Desk_message_TASKCLOSEDOWN,Desk_event_ANY,TaskCloseDownMsg,NULL);
-/*		Desk_Event_Claim(Desk_event_CLICK,mainwin,Desk_event_ANY,IconClick,NULL);*/
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_SRCDRAG,IconDrag,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_DESTDRAG,IconDrag,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_EXCLUDEDRAG,IconDrag,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_NEWDRAG,IconDrag,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_OK,OKClick,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_CANCEL,CancelClick,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,statuswin,status_CANCEL,StatusCancelClick,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,statuswin,status_SKIP,SkipClick,NULL);
+		Desk_Event_Claim(Desk_event_USERDRAG,Desk_event_ANY,Desk_event_ANY,DragHandler,NULL);
 	} Desk_Error2_Catch {
 		Desk_Hourglass_Off();
 		AJWLib_Error2_Report("Fatal error while initialising (%s)");
