@@ -3,12 +3,10 @@ LIBS = \
 	L:Stubs.o.asstubs\
 	MemCheck:o.MC\
 	OSLib:o.oslib\
+	L:tboxlibs.o.eventlib\
 	L:AJWLib.o.AJWLib\
 	L:Desk.o.Desk
 
-
-OBJECTS = \
-	Main.o
 
 INCLUDE	=	C:
 
@@ -20,9 +18,13 @@ LINKFLAGS	=	$(LINKEXTRA) -d
 CC		=	$(MEMCHECK) cc -c $(CCFLAGS)
 LINK		=	DrLink $(LINKFLAGS)
 
+all: !RunImage Backup
 
-!RunImage: $(OBJECTS)
-	$(LINK) -o $@ $(OBJECTS) $(LIBS)
+!RunImage: GUI.o
+	$(LINK) -o $@ GUI.o $(LIBS)
+
+Backup: Main.o
+	$(LINK) -o $@ Main.o $(LIBS)
 
 .c.o:
 	$(CC) $< -o $@
@@ -41,3 +43,9 @@ o.Main:	OSLib:h.osspriteop
 o.Main:	OSLib:h.font
 o.Main:	OSLib:h.wimp
 o.Main:	OSLib:h.hourglass
+o.GUI:	c.GUI
+o.GUI:	C:tboxlibs.h.wimp
+o.GUI:	C:tboxlibs.h.toolbox
+o.GUI:	C:h.kernel
+o.GUI:	C:tboxlibs.h.event
+o.GUI:	C:tboxlibs.h.wimplib
