@@ -124,7 +124,8 @@ Problems
 There are no known bugs at present.
 If you rename a directory, then all the file within it are deemed to
 have changed.
-
+The exclude field only has room for about four or five entries.
+ 
 Suggestions for improvements are welcome.
 If you find a bug, please let me know, or better still fix it yourself
 and send me a patch.
