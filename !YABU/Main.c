@@ -2,36 +2,69 @@
 	Backup
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.2 2000-11-04 17:51:52 AJW Exp $
+	$Id: Main.c,v 1.3 2000-11-09 23:30:24 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
 
 #include "OSLib:osgbpb.h"
 #include "OSLib:fileraction.h"
-#include "OSLib:wimp.h"
-#include "OSLib:hourglass.h"
+
+#include "Desk.Window.h"
+#include "Desk.Error2.h"
+#include "Desk.Event.h"
+#include "Desk.EventMsg.h"
+#include "Desk.Handler.h"
+#include "Desk.Hourglass.h"
+#include "Desk.Icon.h"
+#include "Desk.Menu.h"
+#include "Desk.Msgs.h"
+#include "Desk.DeskMem.h"
+#include "Desk.Resource.h"
+#include "Desk.Screen.h"
+#include "Desk.Template.h"
+#include "Desk.Str.h"
+#include "Desk.File.h"
+#include "Desk.Sprite.h"
+
+#include "AJWLib.Window.h"
+#include "AJWLib.Menu.h"
+#include "AJWLib.Msgs.h"
+#include "AJWLib.Error2.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <time.h>
 #include <string.h>
 
-#define TASKNAME "Backup"
+#define DIRPREFIX "Backup"
+#define VERSION "1.00"
+#define AUTHOR "© Alex Waugh 2000"
+
+#define iconbarmenu_INFO 0
+#define iconbarmenu_QUIT 1
+
+#define icon_OK 16
+#define icon_CANCEL 15
+#define icon_IMAGES 5
+#define icon_SRC 6
+#define icon_SRCDRAG 11
+#define icon_DEST 7
+#define icon_DESTDRAG 12
+#define icon_EXCLUDE 8
+#define icon_EXCLUDEDRAG 13
+#define icon_EXIST 9
+#define icon_NEW 10
+#define icon_NEWDRAG 14
+
+#define MAXICONLENGTH 256
 
 #define BUFFER_SIZE 1024
 #define HASHTABLE_INCREMENT 1024
 
-#define Error(s) {\
-	fprintf(stderr,"%s\n",s);\
-	xhourglass_smash();\
-	exit(EXIT_FAILURE);\
-}
+#define CheckOS(x) Desk_Error2_CheckOS((Desk_os_error *)x)
 
-#define E(x) {\
-	os_error *err=x;\
-	if (err!=NULL) Error(err->errmess);\
-}
 
 static struct {
 	int traverseimages;
@@ -49,6 +82,14 @@ struct hashentry {
 static struct hashentry **hashtable=NULL;
 static int hashtableentries=0,hashtablesize=0;
 static char *srcdir=NULL,*destdir=NULL;
+
+static Desk_bool keeppolling=Desk_FALSE;
+static Desk_task_handle fileractiontaskhandle=0;
+
+static Desk_window_handle proginfowin,mainwin;
+static Desk_menu_ptr iconbarmenu;
+static char *taskname=NULL,*errbad=NULL;
+
 
 static int GenerateKey(char *filename, int size)
 /*generate a hash table key for given filename*/
@@ -108,8 +149,7 @@ static void ReadFile(void)
 
 	hashtablesize=HASHTABLE_INCREMENT;
 	hashtableentries=0;
-	hashtable=malloc(hashtablesize*sizeof(struct hashentry *));
-	if (hashtable==NULL) Error("Not enough memory");
+	hashtable=Desk_DeskMem_Malloc(hashtablesize*sizeof(struct hashentry *));
 	for (i=0; i<hashtablesize; i++) hashtable[i] = NULL;
 	if (oldlistfile) {
 		while (!feof(oldlistfile)) {
@@ -119,13 +159,11 @@ static void ReadFile(void)
 			if (linebuffer[0]=='#') continue;
 			/*Parse line*/
 			if (sscanf(linebuffer,"%X\t%X\t%u\t%s\n",&load_addr,&exec_addr,&size,namebuffer)==4) {
-				entry=malloc(sizeof(struct hashentry));
-				if (entry==NULL) Error("Not enough memory");
+				entry=Desk_DeskMem_Malloc(sizeof(struct hashentry));
 				entry->load_addr=load_addr;
 				entry->exec_addr=exec_addr;
 				entry->size=size;
-				entry->filename=malloc(strlen(namebuffer)+1);
-				if (entry->filename==NULL) Error("Not enough memory");
+				entry->filename=Desk_DeskMem_Malloc(strlen(namebuffer)+1);
 				strcpy(entry->filename,namebuffer);
 				/*Put details in hash table*/
 				InsertEntry(entry);
@@ -147,26 +185,22 @@ static struct hashentry *FindEntry(char *filename)
 	return NULL;
 }
 
-static void StartFilerAction(wimp_t fileractiontaskhandle,char *dest)
+static Desk_bool TaskCloseDownMsg(Desk_event_pollblock *block,void *ref)
 {
-	wimp_event_no event;
-	wimp_block pollblock;
-	int poll=1;
+	Desk_UNUSED(ref);
+	if (block->data.message.header.sender==fileractiontaskhandle) keeppolling=Desk_FALSE;
+	return Desk_TRUE;
+}
 
-	E(xfileractionsendstartoperation_copy(fileractiontaskhandle,(fileraction_VERBOSE | fileraction_FORCE/* | fileraction_FASTER*/),dest,strlen(dest)+1));
+static void StartFilerAction(char *dest)
+{
+	CheckOS(xfileractionsendstartoperation_copy((wimp_t)fileractiontaskhandle,(fileraction_VERBOSE | fileraction_FORCE/* | fileraction_FASTER*/),dest,strlen(dest)+1));
 
 	/*Poll the wimp, and let Filer_Action do it's thing*/
-	E(xhourglass_off());
-	do {
-		E(xwimp_poll((wimp_MASK_NULL | wimp_MASK_POLLWORD),&pollblock,NULL,&event));
-		switch (event) {
-			case wimp_USER_MESSAGE:
-			case wimp_USER_MESSAGE_RECORDED:
-				if (pollblock.message.action==message_QUIT) exit(EXIT_SUCCESS);
-				if (pollblock.message.action==message_TASK_CLOSE_DOWN && pollblock.message.sender==fileractiontaskhandle) poll=0;
-		}
-	} while (poll);
-	E(xhourglass_on());
+	Desk_Hourglass_Off();
+	keeppolling=Desk_TRUE;
+	while (keeppolling) Desk_Event_Poll();
+	Desk_Hourglass_On();
 }
 
 static void TraverseDir(char *dir)
@@ -177,7 +211,13 @@ static void TraverseDir(char *dir)
 	char destdirbuffer[BUFFER_SIZE];
 	char namebuffer[BUFFER_SIZE];
 	osgbpb_info_list *namelist=(osgbpb_info_list *)namebuffer;
-	wimp_t fileractiontaskhandle=0;
+
+	/*Do a bit of multitasking*/
+	Desk_Event_mask.data.null=0;
+	Desk_Hourglass_Off();
+	Desk_Event_Poll();
+	Desk_Hourglass_On();
+	Desk_Event_mask.data.null=1;
 
 	/*Get full name of directory we are copying from and to*/
 	if (dir) sprintf(srcdirbuffer,"%s.%s",srcdir,dir); else sprintf(srcdirbuffer,"%s",srcdir);
@@ -187,13 +227,13 @@ static void TraverseDir(char *dir)
 
 	/*Scan thought the directory contents*/
 	do {
-		E(xosgbpb_dir_entries_info(srcdirbuffer,namelist,1,context,BUFFER_SIZE,NULL,&numread,&context));
+		CheckOS(xosgbpb_dir_entries_info(srcdirbuffer,namelist,1,context,BUFFER_SIZE,NULL,&numread,&context));
 		if (numread!=0) {
 			char buffer[BUFFER_SIZE];
 
 			if (dir) sprintf(buffer,"%s.%s",dir,namelist->info[0].name); else sprintf(buffer,"%s",namelist->info[0].name);
 			if (namelist->info[0].obj_type==fileswitch_IS_DIR || (config.traverseimages && namelist->info[0].obj_type==fileswitch_IS_IMAGE)) {
-				if (destdir && fileractiontaskhandle) StartFilerAction(fileractiontaskhandle,destdirbuffer);
+				if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
 				fileractiontaskhandle=0;
 				TraverseDir(buffer);
 			} else {
@@ -218,46 +258,49 @@ static void TraverseDir(char *dir)
 					if (destdir) {
 						/*Start Filer_Action task if it isn't already started*/
 						if (fileractiontaskhandle==0) {
-							E(xwimp_start_task("Filer_Action",&fileractiontaskhandle));
-							E(xfileraction_send_selected_directory(fileractiontaskhandle,srcdirbuffer));
+							Desk_Wimp_StartTask3("Filer_Action",&fileractiontaskhandle);
+							CheckOS(xfileraction_send_selected_directory((wimp_t)fileractiontaskhandle,srcdirbuffer));
 						}
-						E(xfileraction_send_selected_file(fileractiontaskhandle,namelist->info[0].name));
+						CheckOS(xfileraction_send_selected_file((wimp_t)fileractiontaskhandle,namelist->info[0].name));
 					}
 				}
 			}
 		}
 	} while (context!=osgbpb_NO_MORE);
-	if (destdir && fileractiontaskhandle) StartFilerAction(fileractiontaskhandle,destdirbuffer);
+	if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
 	fileractiontaskhandle=0;
 }
 
-int main(int argc, char *argv[])
+static void Backup(void)
 {
 	time_t currenttime;
-	int msgs[]={message_TASK_CLOSE_DOWN,message_QUIT};
+	char *icontext;
 
-	MemCheck_Init();
-	MemCheck_RegisterArgs(argc,argv);
-	MemCheck_InterceptSCLStringFunctions();
-	MemCheck_SetStoreMallocFunctions(1);
-	MemCheck_SetAutoOutputBlocksInfo(0);
-
-	/*Initialise*/
-	E(xwimp_initialise(wimp_VERSION_RO3,TASKNAME,(wimp_message_list *)msgs,NULL,NULL));
-	E(xhourglass_on());
-
-	/*Sort out command line arguments*/
-	if (argc!=5) Error("Usage: "TASKNAME" srcdir destdir oldlist newlist");
-	if (strcmp(argv[3],"none")!=0) {
-		oldlistfile=fopen(argv[3],"r");
-		if (oldlistfile==NULL) Error("Unable to open old list file");
+	Desk_Hourglass_On();
+	icontext=Desk_Icon_GetTextPtr(mainwin,icon_EXIST);
+	if (icontext[0]) {
+		oldlistfile=fopen(icontext,"r");
+		if (oldlistfile==NULL) AJWLib_Error2_HandleMsgs("Error.Open1:Can't open file");
+	} else {
+		oldlistfile=NULL;
 	}
-	if (strcmp(argv[1],"none")==0) Error("Source directory cannot be none");
-	srcdir=argv[1];
-	if (strcmp(argv[2],"none")!=0) destdir=argv[2];
-	if (strcmp(argv[4],"none")!=0) {
-		listfile=fopen(argv[4],"w");
-		if (listfile==NULL) Error("Unable to open new list file");
+
+	icontext=Desk_Icon_GetTextPtr(mainwin,icon_SRC);
+	if (icontext[0]) {
+		srcdir=icontext;
+	} else {
+		AJWLib_Error2_HandleMsgs("Error.NoSrc:Source directory cannot be none");
+	}
+
+	icontext=Desk_Icon_GetTextPtr(mainwin,icon_DEST);
+	if (icontext[0]) destdir=icontext; else destdir=NULL;
+
+	icontext=Desk_Icon_GetTextPtr(mainwin,icon_NEW);
+	if (icontext[0]) {
+		listfile=fopen(icontext,"w");
+		if (listfile==NULL) AJWLib_Error2_HandleMsgs("Error.Open2:Unable to open new list file");
+	} else {
+		listfile=NULL;
 	}
 
 	/*Read contents of old list file into hash table*/
@@ -284,7 +327,151 @@ int main(int argc, char *argv[])
 	/*Tidy up*/
 	if (listfile) fclose(listfile);
 	if (oldlistfile) fclose(oldlistfile);
-	E(xhourglass_off());
-	return 0;
+	Desk_Hourglass_Off();
 }
+
+static Desk_bool ReceiveDrag(Desk_event_pollblock *block, void *ref)
+{
+	char *text;
+	int len=0;
+	Desk_bool replace;
+
+	Desk_UNUSED(ref);
+	switch (block->data.message.data.dataload.icon) {
+		case icon_SRC:
+		case icon_EXCLUDE:
+			replace=Desk_FALSE;
+			break;
+		case icon_DEST:
+		case icon_EXIST:
+		case icon_NEW:
+			replace=Desk_TRUE;
+			break;
+		default:
+			replace=Desk_FALSE;
+			return Desk_FALSE;
+	}
+	text=Desk_Icon_GetTextPtr(mainwin,block->data.message.data.dataload.icon);
+	if (!replace) len=strlen(text);
+	if (len+2+strlen(block->data.message.data.dataload.filename)>MAXICONLENGTH) {
+		Desk_Error_Report(1,"Not enough room in icon"); /*msgs*/
+		return Desk_TRUE;
+	}
+	if (replace) {
+		strcpy(text,block->data.message.data.dataload.filename);
+	} else {
+		if (text[0]) strcat(text,",");
+		strcat(text,block->data.message.data.dataload.filename);
+	}
+	Desk_Icon_ForceRedraw(mainwin,block->data.message.data.dataload.icon);
+	return Desk_TRUE;
+}
+
+static Desk_bool IconBarClick(Desk_event_pollblock *block, void *ref)
+{
+	Desk_UNUSED(ref);
+	if (block->data.mouse.button.data.select) {
+		Desk_Window_Show(mainwin,Desk_open_CENTERED);
+		return Desk_TRUE;
+	}
+	return Desk_FALSE;
+}
+
+static Desk_bool CancelClick(Desk_event_pollblock *block, void *ref)
+{
+	Desk_UNUSED(ref);
+	if (block->data.mouse.button.data.menu) return Desk_FALSE;
+	if (block->data.mouse.button.data.select) Desk_Window_Hide(mainwin);
+	return Desk_TRUE;
+}
+
+static Desk_bool OKClick(Desk_event_pollblock *block, void *ref)
+{
+	Desk_UNUSED(ref);
+	if (block->data.mouse.button.data.menu) return Desk_FALSE;
+	if (block->data.mouse.button.data.select) Desk_Window_Hide(mainwin);
+	Backup();
+	return Desk_TRUE;
+}
+
+static void IconBarMenuClick(int entry, void *ref)
+{
+	Desk_UNUSED(ref);
+	if (entry==iconbarmenu_QUIT) Desk_Event_CloseDown();
+}
+
+int main(int argc, char *argv[])
+{
+	MemCheck_Init();
+	MemCheck_RegisterArgs(argc,argv);
+	MemCheck_InterceptSCLStringFunctions();
+	MemCheck_SetStoreMallocFunctions(1);
+	MemCheck_SetAutoOutputBlocksInfo(0);
+
+	Desk_Error2_Init_JumpSig();
+	signal(SIGABRT,SIG_DFL);
+
+	Desk_Error2_Try {
+		Desk_Hourglass_On();
+		MemCheck_SetChecking(0,0);
+		Desk_Resource_Initialise(DIRPREFIX);
+		MemCheck_SetChecking(1,1);
+		Desk_Msgs_LoadFile("Messages");
+		Desk_Event_Initialise(taskname=AJWLib_Msgs_Lookup("Task.Name:"));
+		errbad=AJWLib_Msgs_Lookup("Error.Bad:%s Click Ok to continue, Cancel to quit.");
+		Desk_EventMsg_Initialise();
+		Desk_Screen_CacheModeInfo();
+		Desk_Template_Initialise();
+		Desk_EventMsg_Claim(Desk_message_MODECHANGE,Desk_event_ANY,Desk_Handler_ModeChange,NULL);
+		Desk_Event_Claim(Desk_event_CLOSE,Desk_event_ANY,Desk_event_ANY,Desk_Handler_CloseWindow,NULL);
+		Desk_Event_Claim(Desk_event_OPEN,Desk_event_ANY,Desk_event_ANY,Desk_Handler_OpenWindow,NULL);
+		Desk_Event_Claim(Desk_event_KEY,Desk_event_ANY,Desk_event_ANY,Desk_Handler_Key,NULL);
+		Desk_Event_Claim(Desk_event_REDRAW,Desk_event_ANY,Desk_event_ANY,Desk_Handler_HatchRedraw,NULL);
+		Desk_Icon_BarIcon(AJWLib_Msgs_TempLookup("Task.Icon:"),Desk_iconbar_RIGHT);
+		Desk_Template_LoadFile("Templates");
+		proginfowin=AJWLib_Window_CreateInfoWindowFromMsgs("Task.Name:","Task.Purpose:",AUTHOR,VERSION);
+		mainwin=Desk_Window_Create("main",Desk_template_TITLEMIN);
+		iconbarmenu=AJWLib_Menu_CreateFromMsgs("Title.IconBar:","Menu.IconBar:Info,Quit",IconBarMenuClick,NULL);
+		Desk_Menu_AddSubMenu(iconbarmenu,iconbarmenu_INFO,(Desk_menu_ptr)proginfowin);
+		AJWLib_Menu_Attach(Desk_window_ICONBAR,Desk_event_ANY,iconbarmenu,Desk_button_MENU);
+		Desk_Event_Claim(Desk_event_CLICK,Desk_window_ICONBAR,Desk_event_ANY,IconBarClick,NULL);
+		Desk_EventMsg_Claim(Desk_message_DATALOAD,mainwin,ReceiveDrag,NULL);
+		Desk_EventMsg_Claim(Desk_message_TASKCLOSEDOWN,Desk_event_ANY,TaskCloseDownMsg,NULL);
+/*		Desk_Event_Claim(Desk_event_CLICK,mainwin,Desk_event_ANY,IconClick,NULL);*/
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_OK,OKClick,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_CANCEL,CancelClick,NULL);
+	} Desk_Error2_Catch {
+		Desk_Hourglass_Off();
+		AJWLib_Error2_Report("Fatal error while initialising (%s)");
+		return EXIT_FAILURE;
+	} Desk_Error2_EndCatch
+
+
+	/*Sort out command line arguments*/
+/*	if (argc!=5) Error("Usage: "TASKNAME" srcdir destdir oldlist newlist");
+	if (strcmp(argv[3],"none")!=0) {
+		oldlistfile=fopen(argv[3],"r");
+		if (oldlistfile==NULL) Error("Unable to open old list file");
+	}
+	if (strcmp(argv[1],"none")==0) Error("Source directory cannot be none");
+	srcdir=argv[1];
+	if (strcmp(argv[2],"none")!=0) destdir=argv[2];
+	if (strcmp(argv[4],"none")!=0) {
+		listfile=fopen(argv[4],"w");
+		if (listfile==NULL) Error("Unable to open new list file");
+	}*/
+
+	Desk_Hourglass_Off();
+	while (Desk_TRUE) {
+		Desk_Error2_Try {
+			Desk_Event_Poll();
+		} Desk_Error2_Catch {
+			Desk_os_error errblk={1,""};
+			sprintf(errblk.errmess,errbad,AJWLib_Error2_Describe(&Desk_Error2_globalblock));
+			if (Desk_Wimp_ReportErrorR(&errblk,3,taskname)==Desk_wimp_reporterror_button_CANCEL) return EXIT_FAILURE;
+		} Desk_Error2_EndCatch
+	}
+	return EXIT_SUCCESS;
+}
+
 

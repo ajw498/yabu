@@ -1,1 +1,11 @@
-_TaskName:Backup GUI
+Task.Name:Backup
+Task.Icon:!backup
+Task.Purpose:Backup files
+
+Title.IconBar:<Task.Name>
+Menu.IconBar:Info,Quit
+
+Error.NoMem:Not enough free memory.
+Error.BadDrag:Data transfer failed, reciever died
+Error.Bad:Sorry, <Task.Name> has suffered an error (%s). Click Ok to continue or Cancel to quit.
+Error.Fatal:Sorry, <Task.Name> has suffered an internal error (%s) and must exit immediately.
