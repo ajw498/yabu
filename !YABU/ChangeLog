@@ -1,3 +1,10 @@
+v1.03 19-Sep-01
+Added Verbose on/off option
+Filenames are passed through strftime to allow backups to directories based on the current date/time
+Options file can now be specified on the command line
+Directory scanning code is now approximately 40% faster
+Multitasking is now done by time rather than once per directory
+
 v1.02 23-Feb-01
 Fixed bug that caused some files to be copied even if they were in the exclude list
 

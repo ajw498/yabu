@@ -112,6 +112,59 @@ to upper case then it will not work as the files will be considered
 different. If you write Joliet format CDs and use CDROMFS then this will
 not be a problem.
 
+Specifying files on the command line
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Rather than entering all the directories in the main window, it is
+possible to create a file containing all the options. The name of this
+file can be specified on the command line, and if present YABU will use
+the settings in this file and start the backup immediately. When the
+backup is finished, YABU will quit.
+This makes it is possible to run YABU automatically at specified times,
+by setting a task alarm with !Alarm.
+For example, you could set a repeating task alarm to start a backup
+during each night. The command to use would be something like
+<YABU$Dir> IDEFS::Toffee.$.BackupSettings
+
+The format of the backup settings file is straightforward:
+The first line is the source directory/directories
+The second line is the destination directory
+The third line is the list of files/directories to exclude
+The forth line is the existing files list
+The fifth line is the new files list
+The sixth line is a number 0 or 1 indicating whether to treat image
+files as directories
+The seventh line is a number 0 or 1 indicating whether to enable faster
+The eighth line is a number 0 or 1 indicating whether to enable verbose
+
+If any of the filenames are not needed, then just leave a blank line
+in their place.
+
+Time/Date
+~~~~~~~~~
+
+All the filenames in the main window or in a settings file are passed
+through the standard C function strftime, which allows you to change the
+filenames depending on the date or time. For example, if you entered the
+destination directory as IDEFS::Toffee.$.Backup-%d-%m-%Y
+then, if the date was the 19th of September 2001, it would be expanded to
+IDEFS::Toffee.$.Backup-19-9-2001
+
+The valid letters following a % are:
+a,A,w	The weekday is output as an abbreviated name (a), full name (A), or decimal (w) with 0=Sunday, 6=Saturday.
+b,B,m	The month is output as an abbreviated name (b), full name (B), ordecimal (m) with 1=January, 12=December.
+c	The date and time are output in local format.
+d	The day of the month is output (01-31).
+H,I	The hour is output in 24 (H) or 12 (I) hour format.
+j	The day of the year is output (001-366).
+M	The minute is output as a decimal (00-59).
+p	The 12 hour status (ie AM or PM) is output.
+S	The second is output as a decimal (00-61).
+U,W	The week of the year is output as a decimal (00-53), counting Sunday (U) or Monday (W) as the first day of the week.
+y,Y	The year is output as a decimal, without century (y) or with century (Y).
+Z	The timezone name is output (or nothing if none).
+
+
 
 What happens when everything goes pear shaped and I need to restore
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -139,15 +192,14 @@ with the same pathname as one from the second directory will get
 overwritten by the one from the second directory).
 
 Filename matching for the exclude list is done case insensitively, so
-it may cause problems if used on a case sensitive filesystem such as nfs.
+it may cause problems if used on a case sensitive filesystem.
 
 Suggestions for improvements are welcome.
 If you find a bug, please let me know, or better still fix it yourself
 and send me a patch.
 
 Any updates will be available from
-http://www.ecs.soton.ac.uk/~ajw498/utilities/
+http://www.alexwaugh.com/
 
-Alex Waugh
-ajw498@ecs.soton.ac.uk
+Alex Waugh <alex@alexwaugh.com>
 

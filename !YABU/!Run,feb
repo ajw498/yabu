@@ -2,5 +2,5 @@ Set YABU$Dir <Obey$Dir>
 
 IconSprites <YABU$Dir>.!Sprites
 
-WimpSlot -Min 68k -Max 68k
-Run <YABU$Dir>.!RunImage
+|WimpSlot -Min 68k -Max 68k
+Run <YABU$Dir>.!RunImage %*0 2><YABU$Dir>.stderr
