@@ -1,3 +1,6 @@
+v1.02 23-Feb-01
+Fixed bug that caused some files to be copied even if they were in the exclude list
+
 v1.01 12-Feb-01
 Added saving of default setup.
 Added ability to specify more than one directory in the source field.

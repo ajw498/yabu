@@ -18,7 +18,7 @@
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-	$Id: Main.c,v 1.12 2001-02-12 21:49:57 AJW Exp $
+	$Id: Main.c,v 1.13 2001-02-25 22:14:51 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
@@ -60,7 +60,7 @@
 #include <string.h>
 
 #define DIRPREFIX "YABU"
-#define VERSION "1.01 (12-Feb-2001)"
+#define VERSION "1.02 (23-Feb-2001)"
 #define AUTHOR "© Alex Waugh 2000"
 
 #define iconbarmenu_INFO 0
@@ -103,6 +103,16 @@
 	Desk_Hourglass_On();\
 	Desk_Event_mask.data.null=1;\
 }
+
+/*static void debug_printf(char *fmt,...)
+{
+	va_list args;
+
+	va_start(args,fmt);
+	vfprintf(stderr,fmt,args);
+	va_end(args);
+} */
+
 
 static struct {
 	char *src;
@@ -175,7 +185,8 @@ static void InsertEntry(struct hashentry *entry) {
 	if ((hashtableentries*4)/3>hashtablesize) {
 		/*increase the size of the hash table*/
 		struct hashentry **newhash;
-		
+
+/*		debug_printf("Increasing hashtable size: entries=%d, oldsize=%d",hashtableentries,hashtablesize);*/
 		newhash = malloc((hashtablesize+HASHTABLE_INCREMENT)*sizeof(struct hashentry *));
 		if (!newhash) return;
 		for (i=0; i<hashtablesize+HASHTABLE_INCREMENT; i++) newhash[i] = NULL;
@@ -185,9 +196,11 @@ static void InsertEntry(struct hashentry *entry) {
 		hashtablesize += HASHTABLE_INCREMENT;
 		free(hashtable);
 		hashtable = newhash;
+/*		debug_printf(", newsize=%d\n",hashtablesize);*/
 
 	}
-	
+
+/*	debug_printf("Adding entry to hashtable: %s\n",entry->filename);*/
 	InsertIntoHash(hashtable,hashtablesize,entry);
 	hashtableentries++;
 }
@@ -241,10 +254,14 @@ static struct hashentry *FindEntry(char *filename)
 
 	key=GenerateKey(filename,hashtablesize);
 	while (hashtable[key]) {
-		if (strcmp(hashtable[key]->filename,filename)==0) return hashtable[key];
+		if (strcmp(hashtable[key]->filename,filename)==0) {
+/*			debug_printf("Entry found in hashtable: %s\n",filename);*/
+			return hashtable[key];
+		}
 		key++;
 		if (key>=hashtablesize) key = 0;
 	}
+/*	debug_printf("Entry not in hashtable: %s\n",filename);*/
 	return NULL;
 }
 
@@ -323,14 +340,18 @@ static void TraverseDir(char *dir)
 			Desk_bool exclude=Desk_FALSE;
 			int i;
 
-			if (dir) sprintf(buffer,"%s.%s.%s",srcdirbuffer,dir,namelist->info[0].name); else sprintf(buffer,"%s.%s",srcdirbuffer,namelist->info[0].name);
+			sprintf(buffer,"%s.%s",srcdirbuffer,namelist->info[0].name);
 			if (xosfscontrol_canonicalise_path(buffer,canonical,NULL,NULL,BUFFER_SIZE,&i)) strcpy(canonical,buffer);
+/*			debug_printf("Comparing %s with excludes",canonical);*/
 			for (i=0;i<numexcludes;i++) {
-				if (strcmp(canonical,excludes[i])==0) {
+/*				debug_printf("\n%s",excludes[i]);*/
+				if (Desk_stricmp(canonical,excludes[i])==0) {
 					exclude=Desk_TRUE;
+/*					debug_printf(" Match\n");*/
 					break;
 				}
 			}
+/*			debug_printf("\nNo match\n");*/
 			if (dir) sprintf(buffer,"%s.%s",dir,namelist->info[0].name); else sprintf(buffer,"%s",namelist->info[0].name);
 			if (!exclude) {
 				if (namelist->info[0].obj_type==fileswitch_IS_DIR || (traverseimages && namelist->info[0].obj_type==fileswitch_IS_IMAGE)) {

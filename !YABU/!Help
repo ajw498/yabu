@@ -137,7 +137,10 @@ of those files will end up in the destination directory (you are
 effectivly merging two directories and so any file from one directory
 with the same pathname as one from the second directory will get
 overwritten by the one from the second directory).
- 
+
+Filename matching for the exclude list is done case insensitively, so
+it may cause problems if used on a case sensitive filesystem such as nfs.
+
 Suggestions for improvements are welcome.
 If you find a bug, please let me know, or better still fix it yourself
 and send me a patch.
