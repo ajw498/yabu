@@ -3,7 +3,7 @@ LIBS = \
 	L:Stubs.o.asstubs\
 	MemCheck:o.MC\
 	OSLib:o.oslib\
-	L:AJWLib.mc.AJWLib\
+	L:AJWLib.o.AJWLib\
 	L:Desk.o.Desk
 
 #	L:AJWLib.o.AJWLib\
@@ -14,7 +14,7 @@ CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -g -I$(INCLUDE) -fah
 #CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -depend !Depend -I$(INCLUDE) -fah
 LINKFLAGS	=	$(LINKEXTRA) -d
 
-MEMCHECK	=	MemCheck.cc
+#MEMCHECK	=	MemCheck.cc
 CC		=	$(MEMCHECK) cc -c $(CCFLAGS)
 LINK		=	DrLink $(LINKFLAGS)
 
@@ -37,9 +37,6 @@ o.GUI:	C:tboxlibs.h.menu
 o.GUI:	C:tboxlibs.h.gadgets
 o.Main:	c.Main
 o.Main:	MemCheck:h.MemCheck
-o.Main:	C:h.stddef
-o.Main:	C:h.stdio
-o.Main:	C:h.stdarg
 o.Main:	OSLib:h.osgbpb
 o.Main:	OSLib:h.types
 o.Main:	OSLib:h.os
@@ -51,18 +48,12 @@ o.Main:	OSLib:h.font
 o.Main:	C:Desk.h.Window
 o.Main:	C:Desk.h.Wimp
 o.Main:	C:Desk.h.Core
-o.Main:	C:h.stddef
 o.Main:	C:h.kernel
 o.Main:	C:Desk.h.WimpSWIs
 o.Main:	C:Desk.h.Error2
-o.Main:	C:h.stdio
-o.Main:	C:h.stdarg
 o.Main:	C:Desk.h.Error
 o.Main:	C:Desk.h.JumpRaw
-o.Main:	C:h.setjmp
 o.Main:	C:Desk.h.Debug
-o.Main:	C:h.stdio
-o.Main:	C:h.stdarg
 o.Main:	C:Desk.h.Pointer
 o.Main:	C:Desk.h.Icon
 o.Main:	C:Desk.h.DragASpr
@@ -77,16 +68,12 @@ o.Main:	C:Desk.h.Icon
 o.Main:	C:Desk.h.Menu
 o.Main:	C:Desk.h.Msgs
 o.Main:	C:Desk.h.DeskMem
-o.Main:	C:h.stdlib
-o.Main:	C:h.stddef
 o.Main:	C:Desk.h.Resource
 o.Main:	C:Desk.h.Sprite
-o.Main:	C:h.stdarg
 o.Main:	C:Desk.h.Screen
 o.Main:	C:Desk.h.Template
 o.Main:	C:Desk.h.LinkList
 o.Main:	C:Desk.h.Str
-o.Main:	C:h.stddef
 o.Main:	C:Desk.h.File
 o.Main:	C:Desk.h.SWI
 o.Main:	C:Desk.h.Sprite
@@ -97,8 +84,3 @@ o.Main:	C:AJWLib.h.Msgs
 o.Main:	C:Desk.h.Window
 o.Main:	C:Desk.h.Icon
 o.Main:	C:AJWLib.h.Error2
-o.Main:	C:h.stdio
-o.Main:	C:h.stdlib
-o.Main:	C:h.signal
-o.Main:	C:h.time
-o.Main:	C:h.string

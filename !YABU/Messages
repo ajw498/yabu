@@ -8,6 +8,8 @@ Menu.IconBar:Info,Quit
 Status.1:Reading existing files list
 Status.2:Writing files list
 Status.3:Finished
+Status.4:Cancel
+Status.5:Close
 
 Error.NoMem:Not enough free memory.
 Error.BadDrag:Data transfer failed, reciever died

@@ -2,7 +2,7 @@
 	Backup
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.4 2000-11-10 00:04:05 AJW Exp $
+	$Id: Main.c,v 1.5 2000-11-11 14:08:54 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
@@ -48,6 +48,7 @@
 #define icon_OK 16
 #define icon_CANCEL 15
 #define icon_IMAGES 5
+#define icon_FASTER 17
 #define icon_SRC 6
 #define icon_SRCDRAG 11
 #define icon_DEST 7
@@ -61,19 +62,24 @@
 #define status_DIR 0
 #define status_READ 2
 #define status_COPIED 4
-#define status_CANCEL 6
+#define status_SKIP 6
+#define status_CANCEL 7
 
 #define MAXICONLENGTH 256
 
 #define BUFFER_SIZE 1024
-#define HASHTABLE_INCREMENT 1024
+#define HASHTABLE_INCREMENT 10240
 
 #define CheckOS(x) Desk_Error2_CheckOS((Desk_os_error *)x)
 
+#define MultiTask() {\
+ 	Desk_Event_mask.data.null=0;\
+	Desk_Hourglass_Off();\
+	Desk_Event_Poll();\
+	Desk_Hourglass_On();\
+	Desk_Event_mask.data.null=1;\
+}
 
-static struct {
-	int traverseimages;
-} config={0};
 
 static FILE *listfile=NULL,*oldlistfile=NULL;
 
@@ -87,6 +93,8 @@ struct hashentry {
 static struct hashentry **hashtable=NULL;
 static int hashtableentries=0,hashtablesize=0;
 static char *srcdir=NULL,*destdir=NULL;
+static Desk_bool traverseimages,running=Desk_FALSE;
+static int faster=0;
 
 static Desk_bool keeppolling=Desk_FALSE;
 static Desk_task_handle fileractiontaskhandle=0;
@@ -138,6 +146,7 @@ static void InsertEntry(struct hashentry *entry) {
 		hashtablesize += HASHTABLE_INCREMENT;
 		free(hashtable);
 		hashtable = newhash;
+
 	}
 	
 	InsertIntoHash(hashtable,hashtablesize,entry);
@@ -152,6 +161,7 @@ static void ReadFile(void)
 	unsigned int size;
 	struct hashentry *entry;
 	int i;
+	int count=0;
 
 	hashtablesize=HASHTABLE_INCREMENT;
 	hashtableentries=0;
@@ -174,6 +184,13 @@ static void ReadFile(void)
 				strcpy(entry->filename,namebuffer);
 				/*Put details in hash table*/
 				InsertEntry(entry);
+
+				count++;
+				if (count%200==0) {
+					Desk_Icon_SetInteger(statuswin,status_READ,count);
+					MultiTask();
+					if (!running) return;
+				}
 			}
 		}
 	}
@@ -201,13 +218,27 @@ static Desk_bool TaskCloseDownMsg(Desk_event_pollblock *block,void *ref)
 
 static void StartFilerAction(char *dest)
 {
-	CheckOS(xfileractionsendstartoperation_copy((wimp_t)fileractiontaskhandle,(fileraction_VERBOSE | fileraction_FORCE/* | fileraction_FASTER*/),dest,strlen(dest)+1));
+	CheckOS(xfileractionsendstartoperation_copy((wimp_t)fileractiontaskhandle,(fileraction_VERBOSE | fileraction_FORCE | faster),dest,strlen(dest)+1));
 
 	/*Poll the wimp, and let Filer_Action do it's thing*/
-	Desk_Hourglass_Off();
 	keeppolling=Desk_TRUE;
-	while (keeppolling) Desk_Event_Poll();
-	Desk_Hourglass_On();
+	while (keeppolling) {
+		Desk_Hourglass_Off();
+		Desk_Event_Poll();
+		Desk_Hourglass_On();
+		if (!running) return;
+	}
+}
+
+static Desk_bool SkipClick(Desk_event_pollblock *block,void *ref)
+{
+	Desk_UNUSED(ref);
+	if (block->data.mouse.button.data.select) {
+		keeppolling=Desk_FALSE;
+		Desk_Wimp_SetIconState(statuswin,status_SKIP,1<<23,1<<23); /*Delete icon*/
+		Desk_Icon_ForceWindowRedraw(statuswin,status_SKIP);
+	}
+	return Desk_TRUE;
 }
 
 static void TraverseDir(char *dir)
@@ -220,11 +251,8 @@ static void TraverseDir(char *dir)
 	osgbpb_info_list *namelist=(osgbpb_info_list *)namebuffer;
 
 	/*Do a bit of multitasking*/
-	Desk_Event_mask.data.null=0;
-	Desk_Hourglass_Off();
-	Desk_Event_Poll();
-	Desk_Hourglass_On();
-	Desk_Event_mask.data.null=1;
+	MultiTask();
+	if (!running) return;
 
 	/*Get full name of directory we are copying from and to*/
 	if (dir) sprintf(srcdirbuffer,"%s.%s",srcdir,dir); else sprintf(srcdirbuffer,"%s",srcdir);
@@ -236,17 +264,31 @@ static void TraverseDir(char *dir)
 
 	/*Scan thought the directory contents*/
 	do {
-		CheckOS(xosgbpb_dir_entries_info(srcdirbuffer,namelist,1,context,BUFFER_SIZE,NULL,&numread,&context));
+		os_error *err;
+		err=xosgbpb_dir_entries_info(srcdirbuffer,namelist,1,context,BUFFER_SIZE,NULL,&numread,&context);
+		if (err) {
+			Desk_Icon_SetText(statuswin,status_READ,err->errmess);
+			Desk_Wimp_SetIconState(statuswin,status_SKIP,0,1<<23); /*Undelete icon*/
+			keeppolling=Desk_TRUE;
+			while (keeppolling) {
+				Desk_Hourglass_Off();
+				Desk_Event_Poll();
+				Desk_Hourglass_On();
+				if (!running) return;
+			}
+			return;
+		}
 		if (numread!=0) {
 			char buffer[BUFFER_SIZE];
 
 			if (dir) sprintf(buffer,"%s.%s",dir,namelist->info[0].name); else sprintf(buffer,"%s",namelist->info[0].name);
-			if (namelist->info[0].obj_type==fileswitch_IS_DIR || (config.traverseimages && namelist->info[0].obj_type==fileswitch_IS_IMAGE)) {
+			if (namelist->info[0].obj_type==fileswitch_IS_DIR || (traverseimages && namelist->info[0].obj_type==fileswitch_IS_IMAGE)) {
 				if (destdir && fileractiontaskhandle) StartFilerAction(destdirbuffer);
 				fileractiontaskhandle=0;
 				Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
 				Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
 				TraverseDir(buffer);
+				if (!running) return;
 				Desk_Icon_SetText(statuswin,status_DIR,srcdirbuffer);
 			} else {
 				struct hashentry *entry;
@@ -293,24 +335,33 @@ static void Backup(void)
 	char *icontext;
 
 	Desk_Hourglass_On();
+	running=Desk_TRUE;
 	numfilesread=0;
 	numfilescopied=0;
 	Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
 	Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
+	AJWLib_Msgs_SetText(statuswin,status_CANCEL,"Status.4:");
 
-	icontext=Desk_Icon_GetTextPtr(mainwin,icon_EXIST);
-	if (icontext[0]) {
-		oldlistfile=fopen(icontext,"r");
-		if (oldlistfile==NULL) AJWLib_Error2_HandleMsgs("Error.Open1:Can't open file");
-	} else {
-		oldlistfile=NULL;
-	}
+	traverseimages=Desk_Icon_GetSelect(mainwin,icon_IMAGES);
+	faster=Desk_Icon_GetSelect(mainwin,icon_FASTER) ? fileraction_FASTER : 0;
 
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_SRC);
 	if (icontext[0]) {
 		srcdir=icontext;
 	} else {
-		AJWLib_Error2_HandleMsgs("Error.NoSrc:Source directory cannot be none");
+		Desk_Msgs_Report(1,"Error.NoSrc:Source directory cannot be left blank");
+		running=Desk_FALSE;
+		return;
+	}
+
+	icontext=Desk_Icon_GetTextPtr(mainwin,icon_EXIST);
+	if (icontext[0]) {
+		oldlistfile=fopen(icontext,"r");
+		if (oldlistfile==NULL) Desk_Msgs_Report(1,"Error.Open1:Can't open file");
+		running=Desk_FALSE;
+		return;
+	} else {
+		oldlistfile=NULL;
 	}
 
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_DEST);
@@ -319,13 +370,22 @@ static void Backup(void)
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_NEW);
 	if (icontext[0]) {
 		listfile=fopen(icontext,"w");
-		if (listfile==NULL) AJWLib_Error2_HandleMsgs("Error.Open2:Unable to open new list file");
+		if (listfile==NULL) Desk_Msgs_Report(1,"Error.Open2:Unable to open new list file");
+		if (oldlistfile) fclose(oldlistfile);
+		running=Desk_FALSE;
+		return;
 	} else {
 		listfile=NULL;
 	}
 
+	Desk_Window_Hide(mainwin);
+	Desk_Window_Show(statuswin,Desk_open_CENTERED);
+
 	/*Read contents of old list file into hash table*/
 	ReadFile();
+
+	Desk_Icon_SetInteger(statuswin,status_COPIED,numfilescopied);
+	Desk_Icon_SetInteger(statuswin,status_READ,numfilesread);
 
 	/*Print date and directory to the file (for human reference only)*/
 	time(&currenttime);
@@ -336,6 +396,7 @@ static void Backup(void)
 
 	/*Concatenate old list file on end of new list file*/
 	if (listfile && oldlistfile) {
+		int count=0;
 		AJWLib_Msgs_SetText(statuswin,status_DIR,"Status.2:");
 		rewind(oldlistfile);
 		while (!feof(oldlistfile)) {
@@ -343,6 +404,10 @@ static void Backup(void)
 
 			buffer[BUFFER_SIZE-1]='\0';
 			if (fgets(buffer,BUFFER_SIZE-1,oldlistfile)) fputs(buffer,listfile);
+
+			count++;
+			if (count%200==0) MultiTask();
+			if (!running) break;
 		}
 	}
 
@@ -350,6 +415,7 @@ static void Backup(void)
 	if (listfile) fclose(listfile);
 	if (oldlistfile) fclose(oldlistfile);
 	AJWLib_Msgs_SetText(statuswin,status_DIR,"Status.3:");
+	AJWLib_Msgs_SetText(statuswin,status_CANCEL,"Status.5:");
 	Desk_Hourglass_Off();
 }
 
@@ -387,6 +453,7 @@ static Desk_bool ReceiveDrag(Desk_event_pollblock *block, void *ref)
 		strcat(text,block->data.message.data.dataload.filename);
 	}
 	Desk_Icon_ForceRedraw(mainwin,block->data.message.data.dataload.icon);
+	Desk_Icon_SetCaret(mainwin,block->data.message.data.dataload.icon);
 	return Desk_TRUE;
 }
 
@@ -394,7 +461,12 @@ static Desk_bool IconBarClick(Desk_event_pollblock *block, void *ref)
 {
 	Desk_UNUSED(ref);
 	if (block->data.mouse.button.data.select) {
-		Desk_Window_Show(mainwin,Desk_open_CENTERED);
+		if (running) {
+			Desk_Window_BringToFront(statuswin);
+		} else {
+			Desk_Window_Show(mainwin,Desk_open_CENTERED);
+			Desk_Icon_SetCaret(mainwin,icon_SRC);
+		}
 		return Desk_TRUE;
 	}
 	return Desk_FALSE;
@@ -408,13 +480,32 @@ static Desk_bool CancelClick(Desk_event_pollblock *block, void *ref)
 	return Desk_TRUE;
 }
 
+static Desk_bool StatusCancelClick(Desk_event_pollblock *block, void *ref)
+{
+	Desk_UNUSED(ref);
+
+	if (block->data.mouse.button.data.menu) return Desk_FALSE;
+	if (block->data.mouse.button.data.select) {
+		Desk_Window_Hide(statuswin);
+		Desk_Wimp_SetIconState(statuswin,status_SKIP,1<<23,1<<23); /*Delete icon*/
+		if (fileractiontaskhandle) {
+			Desk_message_block msgblk;
+
+			msgblk.header.size=sizeof(Desk_message_header);
+			msgblk.header.yourref=0;
+			msgblk.header.action=Desk_message_QUIT;
+			Desk_Wimp_SendMessage(Desk_event_USERMESSAGE,&msgblk,fileractiontaskhandle,-1);
+		}
+		running=Desk_FALSE;
+	}
+	return Desk_TRUE;
+}
+
 static Desk_bool OKClick(Desk_event_pollblock *block, void *ref)
 {
 	Desk_UNUSED(ref);
 	if (block->data.mouse.button.data.menu) return Desk_FALSE;
-	if (block->data.mouse.button.data.select) Desk_Window_Hide(mainwin);
-	Desk_Window_Show(statuswin,Desk_open_CENTERED);
-	Backup();
+	if (block->data.mouse.button.data.select) Backup();
 	return Desk_TRUE;
 }
 
@@ -424,10 +515,10 @@ static void IconBarMenuClick(int entry, void *ref)
 	if (entry==iconbarmenu_QUIT) Desk_Event_CloseDown();
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
 	MemCheck_Init();
-	MemCheck_RegisterArgs(argc,argv);
+/*	MemCheck_RegisterArgs(argc,argv);*/
 	MemCheck_InterceptSCLStringFunctions();
 	MemCheck_SetStoreMallocFunctions(1);
 	MemCheck_SetAutoOutputBlocksInfo(0);
@@ -465,6 +556,8 @@ int main(int argc, char *argv[])
 /*		Desk_Event_Claim(Desk_event_CLICK,mainwin,Desk_event_ANY,IconClick,NULL);*/
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_OK,OKClick,NULL);
 		Desk_Event_Claim(Desk_event_CLICK,mainwin,icon_CANCEL,CancelClick,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,statuswin,status_CANCEL,StatusCancelClick,NULL);
+		Desk_Event_Claim(Desk_event_CLICK,statuswin,status_SKIP,SkipClick,NULL);
 	} Desk_Error2_Catch {
 		Desk_Hourglass_Off();
 		AJWLib_Error2_Report("Fatal error while initialising (%s)");
@@ -472,19 +565,7 @@ int main(int argc, char *argv[])
 	} Desk_Error2_EndCatch
 
 
-	/*Sort out command line arguments*/
-/*	if (argc!=5) Error("Usage: "TASKNAME" srcdir destdir oldlist newlist");
-	if (strcmp(argv[3],"none")!=0) {
-		oldlistfile=fopen(argv[3],"r");
-		if (oldlistfile==NULL) Error("Unable to open old list file");
-	}
-	if (strcmp(argv[1],"none")==0) Error("Source directory cannot be none");
-	srcdir=argv[1];
-	if (strcmp(argv[2],"none")!=0) destdir=argv[2];
-	if (strcmp(argv[4],"none")!=0) {
-		listfile=fopen(argv[4],"w");
-		if (listfile==NULL) Error("Unable to open new list file");
-	}*/
+	/*Sort out command line arguments?*/
 
 	Desk_Hourglass_Off();
 	while (Desk_TRUE) {
