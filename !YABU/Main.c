@@ -2,7 +2,7 @@
 	Backup
 	© Alex Waugh 2000
 
-	$Id: Main.c,v 1.8 2000-11-13 11:53:32 AJW Exp $
+	$Id: Main.c,v 1.9 2000-11-25 00:55:52 AJW Exp $
 */
 
 #include "MemCheck:MemCheck.h"
@@ -114,10 +114,11 @@ static char *taskname=NULL,*errbad=NULL;
 static int GenerateKey(char *filename, int size)
 /*generate a hash table key for given filename*/
 {
-	int len, i, key = 0;
+	int len, i, key = 0, mult;
 	
 	len = strlen(filename);
-	for (i=0; i<len; i++) key += i*filename[i];
+	mult = size/(len+1);
+	for (i=0; i<len; i++) key += mult*i*filename[i];
 	return key % size;
 }
 
