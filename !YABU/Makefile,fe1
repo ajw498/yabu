@@ -1,0 +1,39 @@
+
+LIBS = \
+	L:Stubs.o.asstubs\
+	MemCheck:o.MC\
+	OSLib:o.oslib\
+	L:AJWLib.o.AJWLib\
+	L:Desk.o.Desk
+
+
+OBJECTS = \
+	Main.o
+
+INCLUDE	=	C:
+
+CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -g -I$(INCLUDE) -fah
+#CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -I$(INCLUDE) -DAJWLIB_ASSERT_ERROR2 -fah
+LINKFLAGS	=	$(LINKEXTRA) -d
+
+MEMCHECK	=MemCheck.cc
+CC		=	$(MEMCHECK) cc -c $(CCFLAGS)
+LINK		=	DrLink $(LINKFLAGS)
+
+
+!RunImage: $(OBJECTS)
+	$(LINK) -o $@ $(OBJECTS) $(LIBS)
+
+.c.o:
+	$(CC) $< -o $@
+
+
+# Dynamic dependencies:
+o.Main:	c.Main
+o.Main:	C:h.stdio
+o.Main:	C:h.stdlib
+o.Main:	C:h.time
+o.Main:	OSLib:h.osgbpb
+o.Main:	OSLib:h.types
+o.Main:	OSLib:h.os
+o.Main:	OSLib:h.fileswitch

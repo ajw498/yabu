@@ -1,0 +1,3 @@
+Set Backup$Dir <Obey$Dir>
+
+IconSprites <Obey$Dir>.!Sprites

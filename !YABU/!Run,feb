@@ -1,0 +1,6 @@
+Set Backup$Dir <Obey$Dir>
+
+IconSprites <Backup$Dir>.!Sprites
+
+|WimpSlot -Min 240k -Max 240k
+TaskWindow "Run <Backup$Dir>.!RunImage %*0" -quit 
