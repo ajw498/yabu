@@ -12,11 +12,11 @@ OBJECTS = \
 
 INCLUDE	=	C:
 
-CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -g -I$(INCLUDE) -fah
-#CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -I$(INCLUDE) -DAJWLIB_ASSERT_ERROR2 -fah
+#CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -g -I$(INCLUDE) -fah
+CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -depend !Depend -I$(INCLUDE) -fah
 LINKFLAGS	=	$(LINKEXTRA) -d
 
-MEMCHECK	=MemCheck.cc
+#MEMCHECK	=MemCheck.cc
 CC		=	$(MEMCHECK) cc -c $(CCFLAGS)
 LINK		=	DrLink $(LINKFLAGS)
 
@@ -30,10 +30,14 @@ LINK		=	DrLink $(LINKFLAGS)
 
 # Dynamic dependencies:
 o.Main:	c.Main
-o.Main:	C:h.stdio
-o.Main:	C:h.stdlib
-o.Main:	C:h.time
+o.Main:	MemCheck:h.MemCheck
 o.Main:	OSLib:h.osgbpb
 o.Main:	OSLib:h.types
 o.Main:	OSLib:h.os
 o.Main:	OSLib:h.fileswitch
+o.Main:	OSLib:h.fileraction
+o.Main:	OSLib:h.wimp
+o.Main:	OSLib:h.osspriteop
+o.Main:	OSLib:h.font
+o.Main:	OSLib:h.wimp
+o.Main:	OSLib:h.hourglass
