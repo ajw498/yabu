@@ -1,31 +1,38 @@
+# Makefile for YABU
+
+# Comment out the following four lines if you don't have MemCheck or HierProf
+#MEMCHECK = MemCheck.cc
+#HEIRPROF = -DHierProf_PROFILE
+
+#MEMCHECKLIB = MemCheck:o.MC
+#HIERPROFLIB = HierProf:o.hp
+
 
 LIBS = \
 	C:o.stubs\
-	MemCheck:o.MC\
-	HierProf:o.hp\
+	$(MEMCHECKLIB)\
+	$(HIERPROFLIB)\
 	OSLib:o.oslib\
 	C:AJWLib.o.AJWLib\
 	C:Desk.o.Desk
 
-#MEMCHECK	=	MemCheck.cc
-#HEIRPROF	=	-DHierProf_PROFILE
 
-INCLUDE	=	C:,OSLib:
+INCLUDE = C:,OSLib:
 
-CCFLAGS		=	$(CCEXTRA) -throwback -strict -depend !Depend -Wg -I$(INCLUDE) $(HEIRPROF) -fah
-#CCFLAGS		=	$(CCEXTRA) -throwback -strict -Otime -depend !Depend -I$(INCLUDE) $(HEIRPROF) -fah
-LINKFLAGS	=	$(LINKEXTRA)
+#DEBUG = -g
 
-CC		=	$(MEMCHECK) cc -c $(CCFLAGS)
-LINK		=	Link $(LINKFLAGS)
+CCFLAGS = -throwback -strict -depend !Depend -Wg $(DEBUG) -Otime -I$(INCLUDE) $(HEIRPROF) -fah
+#LINKFLAGS = -d
+
+CC = $(MEMCHECK) cc
+LINK = Link
 
 
 !RunImage: Main.o
-	$(LINK) -o $@ Main.o $(LIBS)
+	$(LINK) $(LINKFLAGS) -o $@ Main.o $(LIBS)
 
 .c.o:
-	$(CC) $< -o $@
+	$(CC) -c $(CCFLAGS) $< -o $@
 
 
 # Dynamic dependencies:
-o.Main: c.Main MemCheck:h.MemCheck HierProf:h.HierProf OSLib:oslib.h.osgbpb OSLib:oslib.h.types OSLib:oslib.h.os OSLib:oslib.h.fileswitch OSLib:oslib.h.osfscontrol OSLib:oslib.h.osfile OSLib:oslib.h.fileraction OSLib:oslib.h.wimp OSLib:oslib.h.osspriteop OSLib:oslib.h.font C:Desk.h.Window C:Desk.h.Wimp C:Desk.h.Core C:h.kernel C:Desk.h.WimpSWIs C:Desk.h.Error2 C:Desk.h.Error C:Desk.h.JumpRaw C:Desk.h.Debug C:Desk.h.Pointer C:Desk.h.Icon C:Desk.h.DragASpr C:Desk.h.Coord C:Desk.h.Core C:Desk.h.Error2 C:Desk.h.Event C:Desk.h.EventMsg C:Desk.h.Handler C:Desk.h.Hourglass C:Desk.h.Icon C:Desk.h.Menu C:Desk.h.Msgs C:Desk.h.Filing C:Desk.h.DeskMem C:Desk.h.Resource C:Desk.h.Sprite C:Desk.h.Screen C:Desk.h.Template C:Desk.h.LinkList C:Desk.h.Str C:Desk.h.File C:Desk.h.SWI C:Desk.h.Sprite C:AJWLib.h.Window C:Desk.h.Sprite C:AJWLib.h.Menu C:AJWLib.h.File C:AJWLib.h.Msgs C:Desk.h.Window C:Desk.h.Icon C:AJWLib.h.Error2

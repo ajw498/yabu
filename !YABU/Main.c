@@ -18,11 +18,15 @@
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-	$Id: Main.c,v 1.14 2001-09-19 20:23:13 AJW Exp $
+	$Id: Main.c,v 1.15 2001-09-19 22:23:58 AJW Exp $
 */
 
+#ifdef MemCheck_MEMCHECK
 #include "MemCheck:MemCheck.h"
+#endif
+#ifdef HierProf_PROFILE
 #include "HierProf:HierProf.h"
+#endif
 
 #include "oslib/osgbpb.h"
 #include "oslib/osfscontrol.h"
@@ -82,6 +86,7 @@
 #define icon_NEWDRAG 14
 #define icon_SAVEDEFAULT 18
 #define icon_VERBOSE 19
+#define icon_MD5 20
 
 #define status_DIR 0
 #define status_READ 2
@@ -94,6 +99,7 @@
 #define MAXSRCS 256
 #define BUFFER_SIZE 1024
 #define HASHTABLE_INCREMENT 10240
+#define MD5LEN 32
 
 #define CheckOS(x) Desk_Error2_CheckOS((Desk_os_error *)x)
 
@@ -106,7 +112,7 @@
 	lastpoll=os_read_monotonic_time();\
 }
 
-#define CHECKPOLL (os_read_monotonic_time()-lastpoll>10)
+#define CHECKPOLL (os_read_monotonic_time()>lastpoll+10)
 
 static struct {
 	char *src;
@@ -117,6 +123,7 @@ static struct {
 	Desk_bool images;
 	Desk_bool faster;
 	Desk_bool verbose;
+	Desk_bool md5;
 } defaults;
 
 static FILE *listfile=NULL,*oldlistfile=NULL;
@@ -125,6 +132,7 @@ struct hashentry {
 	bits load_addr;
 	bits exec_addr;
 	unsigned int size;
+	char md5[MD5LEN];
 	char *filename;
 };
 
@@ -132,7 +140,7 @@ static struct hashentry **hashtable=NULL;
 static int hashtableentries=0,hashtablesize=0;
 static char *srcdir=NULL,*destdir=NULL;
 static Desk_bool traverseimages,running=Desk_FALSE;
-static int faster=0, verbose=1;
+static int faster=0, verbose=1, md5=0;
 static Desk_icon_handle dragicon;
 
 static Desk_bool startimmediatly=Desk_FALSE;
@@ -208,6 +216,11 @@ static void ReadFile(void)
 	struct hashentry *entry;
 	int i;
 	int count=0;
+	int validline;
+	char md5sum[MD5LEN];
+
+	MultiTask();
+	if (!running) return;
 
 	hashtablesize=HASHTABLE_INCREMENT;
 	hashtableentries=0;
@@ -221,11 +234,19 @@ static void ReadFile(void)
 			/*Skip comments*/
 			if (linebuffer[0]=='#') continue;
 			/*Parse line*/
-			if (sscanf(linebuffer,"%X\t%X\t%u\t%s\n",&load_addr,&exec_addr,&size,namebuffer)==4) {
+			if (linebuffer[8]=='\t') {
+				validline=sscanf(linebuffer,"%X\t%X\t%u\t%s\n",&load_addr,&exec_addr,&size,namebuffer)==4;
+				memset(md5sum,0,MD5LEN);
+			} else {
+				validline=sscanf(linebuffer,"%s\t%s\n",md5sum,namebuffer)==2;
+				size=load_addr=exec_addr=0;
+			}
+			if (validline) {
 				entry=Desk_DeskMem_Malloc(sizeof(struct hashentry));
 				entry->load_addr=load_addr;
 				entry->exec_addr=exec_addr;
 				entry->size=size;
+				memcpy(entry->md5,md5sum,MD5LEN);
 				entry->filename=Desk_DeskMem_Malloc(strlen(namebuffer)+1);
 				strcpy(entry->filename,namebuffer);
 				/*Put details in hash table*/
@@ -240,6 +261,8 @@ static void ReadFile(void)
 			}
 		}
 	}
+	MultiTask();
+	if (!running) return;
 }
 
 static struct hashentry *FindEntry(char *filename)
@@ -356,30 +379,43 @@ static void TraverseDir(char *dir)
 				} else {
 					struct hashentry *entry;
 					int copy=1;
-	
+					char md5buf[BUFFER_SIZE];
+					FILE *output;
+
 					numfilesread++;
 					entry=FindEntry(buffer);
+					if (md5) {
+						sprintf(md5buf,"md5sum %s > <Wimp$Scrap>",canonical);
+						Desk_Wimp_StartTask(md5buf);
+						output=AJWLib_File_fopen("<Wimp$Scrap>","r");
+						fread(md5buf,MD5LEN,1,output);
+						fclose(output);
+					}
 					if (entry) {
-#ifdef MD5
-						char buf[256];
-
-						sprintf(buf,"md5sum %s > <Wimp$Scrap>",canonical);
-						Desk_Wimp_StartTask(buf);
-#else
-						if (namelist->info[0].load_addr==entry->load_addr && namelist->info[0].exec_addr==entry->exec_addr && namelist->info[0].size==entry->size) {
-							/*file hasn't changed, so don't copy it*/
-							copy=0;
+						if (md5) {
+							if (memcmp(md5buf,entry->md5,MD5LEN)==0) copy=0;
 						} else {
-							/*File exists, but has changed so copy it*/
-							copy=1;
+							if (namelist->info[0].load_addr==entry->load_addr && namelist->info[0].exec_addr==entry->exec_addr && namelist->info[0].size==entry->size) {
+								/*file hasn't changed, so don't copy it*/
+								copy=0;
+							} else {
+								/*File exists, but has changed so copy it*/
+								copy=1;
+							}
 						}
-#endif
 					} else {
 						/*Doesn't exist in hash, so copy it*/
 						copy=1;
 					}
 					if (copy) {
-						if (listfile) fprintf(listfile,"%08X\t%08X\t%u\t%s\n",namelist->info[0].load_addr,namelist->info[0].exec_addr,namelist->info[0].size,buffer);
+						if (listfile) {
+							if (md5) {
+								fwrite(md5buf,MD5LEN,1,listfile);
+								fprintf(listfile,"\t%s\n",buffer);
+							} else {
+								fprintf(listfile,"%08X\t%08X\t%u\t%s\n",namelist->info[0].load_addr,namelist->info[0].exec_addr,namelist->info[0].size,buffer);
+							}
+						}
 						if (destdir) {
 							numfilescopied++;
 							/*Start Filer_Action task if it isn't already started*/
@@ -426,6 +462,7 @@ static void Backup(void)
 	traverseimages=Desk_Icon_GetSelect(mainwin,icon_IMAGES);
 	faster=Desk_Icon_GetSelect(mainwin,icon_FASTER) ? fileraction_FASTER : 0;
 	verbose=Desk_Icon_GetSelect(mainwin,icon_VERBOSE) ? fileraction_VERBOSE : 0;
+	md5=Desk_Icon_GetSelect(mainwin,icon_MD5);
 
 	icontext=Desk_Icon_GetTextPtr(mainwin,icon_SRC);
 	if (icontext[0]) {
@@ -605,6 +642,7 @@ static void SetIcons(void)
 	Desk_Icon_SetSelect(mainwin,icon_IMAGES,defaults.images);
 	Desk_Icon_SetSelect(mainwin,icon_FASTER,defaults.faster);
 	Desk_Icon_SetSelect(mainwin,icon_VERBOSE,defaults.verbose);
+	Desk_Icon_SetSelect(mainwin,icon_MD5,defaults.md5);
 	Desk_Window_Show(mainwin,Desk_open_CENTERED);
 	Desk_Icon_SetCaret(mainwin,icon_SRC);
 }
@@ -755,6 +793,7 @@ static void LoadDefaults(char *filename)
 	defaults.images=Desk_FALSE;
 	defaults.faster=Desk_FALSE;
 	defaults.verbose=Desk_TRUE;
+	defaults.md5=Desk_TRUE;
 	if (Desk_File_Exists(filename)) {
 		if ((file=Desk_File_AllocLoad0(filename))!=NULL) {
 			defaults.src=file;
@@ -770,6 +809,7 @@ static void LoadDefaults(char *filename)
 			defaults.images=(Desk_bool)strtol(file,&file,10);
 			defaults.faster=(Desk_bool)strtol(file,&file,10);
 			defaults.verbose=(Desk_bool)strtol(file,&file,10);
+			defaults.md5=(Desk_bool)strtol(file,&file,10);
 		}
 	}
 }
@@ -790,6 +830,7 @@ static Desk_bool SaveDefaults(Desk_event_pollblock *block, void *ref)
 	defaults.images=Desk_Icon_GetSelect(mainwin,icon_IMAGES);
 	defaults.faster=Desk_Icon_GetSelect(mainwin,icon_FASTER);
 	defaults.verbose=Desk_Icon_GetSelect(mainwin,icon_VERBOSE);
+	defaults.md5=Desk_Icon_GetSelect(mainwin,icon_MD5);
 	if (getenv("Choices$Write")) {
 		osfile_create_dir("<Choices$Write>.YABU",1);
 		filename="<Choices$Write>.YABU.Defaults";
@@ -805,6 +846,7 @@ static Desk_bool SaveDefaults(Desk_event_pollblock *block, void *ref)
 	fprintf(file,"%d\n",defaults.images);
 	fprintf(file,"%d\n",defaults.faster);
 	fprintf(file,"%d\n",defaults.verbose);
+	fprintf(file,"%d\n",defaults.md5);
 	fclose(file);
 
 	return Desk_TRUE;
@@ -812,22 +854,30 @@ static Desk_bool SaveDefaults(Desk_event_pollblock *block, void *ref)
 
 int main(int argc, char *argv[])
 {
+#ifdef MemCheck_MEMCHECK
 	MemCheck_Init();
 	MemCheck_RegisterArgs(argc,argv);
 	MemCheck_InterceptSCLStringFunctions();
 	MemCheck_SetStoreMallocFunctions(1);
 	MemCheck_SetAutoOutputBlocksInfo(0);
+#endif
 
+#ifdef HierProf_PROFILE
 	HierProf_ProfileAllFunctions();
+#endif
 
 	Desk_Error2_Init_JumpSig();
 	signal(SIGABRT,SIG_DFL);
 
 	Desk_Error2_Try {
 		Desk_Hourglass_On();
+#ifdef MemCheck_MEMCHECK
 		MemCheck_SetChecking(0,0);
+#endif
 		Desk_Resource_Initialise(DIRPREFIX);
+#ifdef MemCheck_MEMCHECK
 		MemCheck_SetChecking(1,1);
+#endif
 		Desk_Msgs_LoadFile("Messages");
 		Desk_Event_Initialise(taskname=AJWLib_Msgs_Lookup("Task.Name:"));
 		errbad=AJWLib_Msgs_Lookup("Error.Bad:%s Click Ok to continue, Cancel to quit.");

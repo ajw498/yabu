@@ -85,17 +85,6 @@ check have actually been copied.
 Files are copied using the Filer Action module (which is the same as is
 used when you copy files in the desktop).
 
-There are two options:
-Treat image files as directories
-If ticked then image files (such as PC partitions, archives if ArcFS or
-SparkFS are loaded, etc.) will be treated as directories rather than
-files. I recommend you leave this unticked.
-Faster
-This has the same effect as faster does when normally copying files in
-the desktop; it makes the copying faster, but leaves the desktop
-slightly less responsive whilst copying. This option will probably only
-have any effect on RISC OS 4.
-
 Save as default:
 If you click on this button then the contents of the window will be
 saved and used as the default settings for the future.
@@ -111,6 +100,42 @@ For example if you backup to CDR, and all the filenames get translated
 to upper case then it will not work as the files will be considered
 different. If you write Joliet format CDs and use CDROMFS then this will
 not be a problem.
+
+Options
+~~~~~~~
+
+There are four options:
+
+Treat image files as directories
+If ticked then image files (such as PC partitions, archives if ArcFS or
+SparkFS are loaded, etc.) will be treated as directories rather than
+files. I recommend you leave this unticked.
+
+Faster
+This has the same effect as faster does when normally copying files in
+the desktop; it makes the copying faster, but leaves the desktop
+slightly less responsive whilst copying. This option will probably only
+have any effect on RISC OS 4.
+
+Verbose
+This has the same effect as verbose does when normally copying files in
+the desktop. If you have this turned on then you may get flickering when
+copying small files, as the filer-action window opens then immediately
+closes again.
+
+MD5
+When this option is selected then YABU uses MD5 checksums to determine
+whether a file has changed, rather than the size and timestamp. This is
+more robust, but takes a lot longer.
+To use MD5, you must have Darren Salt's port of md5sum installed somewhere
+suitable (copying it to !Boot.Library is sufficient).
+ftp://zap.tartarus.org/pub/ds/GNU/textutils.zip
+
+Note: If you do a backup with MD5 turned on, then later do an incremental
+backup of the same files but with MD5 turned off, then all the files will
+be treated as if they had changed. (And the same if MD5 is turned off for
+the first and on for the second).  
+
 
 Specifying files on the command line
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -163,7 +188,6 @@ S	The second is output as a decimal (00-61).
 U,W	The week of the year is output as a decimal (00-53), counting Sunday (U) or Monday (W) as the first day of the week.
 y,Y	The year is output as a decimal, without century (y) or with century (Y).
 Z	The timezone name is output (or nothing if none).
-
 
 
 What happens when everything goes pear shaped and I need to restore

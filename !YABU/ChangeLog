@@ -4,6 +4,7 @@ Filenames are passed through strftime to allow backups to directories based on t
 Options file can now be specified on the command line
 Directory scanning code is now approximately 40% faster
 Multitasking is now done by time rather than once per directory
+Added option to use MD5 checksums
 
 v1.02 23-Feb-01
 Fixed bug that caused some files to be copied even if they were in the exclude list
