@@ -2,15 +2,18 @@
 	Backup GUI
 	© Alex Waugh 2000
 
-	$Id: GUI.c,v 1.1 2000-11-04 20:18:17 AJW Exp $
+	$Id: GUI.c,v 1.2 2000-11-06 22:37:40 AJW Exp $
 
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include "tboxlibs.wimp.h"
 #include "tboxlibs.toolbox.h"
 #include "tboxlibs.event.h"
 #include "tboxlibs.wimplib.h"
+#include "tboxlibs.menu.h"
+#include "tboxlibs.gadgets.h"
 
 #define WimpVersion    310
 
@@ -37,6 +40,18 @@ static int IconbarMenu_Quit(int event_code, ToolboxEvent *event, IdBlock *id_blo
   return(1);
 }
 
+static int DragEnded(int event_code, ToolboxEvent *event, IdBlock *id_block,void *handle)
+{
+  UNUSED(event_code);
+  UNUSED(event);
+  UNUSED(id_block);
+  UNUSED(handle);
+
+  putc('\b',stdout);
+
+  return 1;
+}
+
 
 static int Message_Quit(WimpMessage *message,void *handle)
 {
@@ -50,7 +65,10 @@ static int Message_Quit(WimpMessage *message,void *handle)
 
 int main(void)
 {
-	int    toolbox_events = 0,
+	int    toolbox_events[] = {
+		Draggable_DragEnded,
+		Menu_Selection,
+		0},
            wimp_messages = 0,
            event_code;
 
@@ -58,7 +76,7 @@ int main(void)
      * register ourselves with the Toolbox.
      */
 
-    toolbox_initialise (0, WimpVersion, &wimp_messages, &toolbox_events, "<Backup$Dir>",
+    toolbox_initialise (0, WimpVersion, &wimp_messages, toolbox_events, "<Backup$Dir>",
                         &messages, &id_block, 0, 0, 0);
 
 
@@ -78,7 +96,8 @@ int main(void)
      * received from the wimp.
      */
 
-    event_register_toolbox_handler(-1,1,IconbarMenu_Quit,NULL);
+    event_register_toolbox_handler(-1,Menu_Selection,IconbarMenu_Quit,NULL);
+    event_register_toolbox_handler(1,Draggable_DragEnded,DragEnded,NULL);
     event_register_message_handler(Wimp_MQuit,Message_Quit,NULL);
 
     /*

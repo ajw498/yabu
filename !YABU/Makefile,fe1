@@ -49,3 +49,5 @@ o.GUI:	C:tboxlibs.h.toolbox
 o.GUI:	C:h.kernel
 o.GUI:	C:tboxlibs.h.event
 o.GUI:	C:tboxlibs.h.wimplib
+o.GUI:	C:tboxlibs.h.menu
+o.GUI:	C:tboxlibs.h.gadgets
