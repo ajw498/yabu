@@ -5,6 +5,10 @@ Task.Purpose:Backup files
 Title.IconBar:<Task.Name>
 Menu.IconBar:Info,Quit
 
+Status.1:Reading existing files list
+Status.2:Writing files list
+Status.3:Finished
+
 Error.NoMem:Not enough free memory.
 Error.BadDrag:Data transfer failed, reciever died
 Error.Bad:Sorry, <Task.Name> has suffered an error (%s). Click Ok to continue or Cancel to quit.
